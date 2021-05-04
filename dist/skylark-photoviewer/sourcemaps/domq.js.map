@@ -1,0 +1,1 @@
+{"version":3,"sources":["domq.js"],"names":["define","$"],"mappings":";;;;;;;AAAAA,QAAQ,kBAAmB,SAAUC,GACjC,aAEA,OAAOA","file":"../domq.js","sourcesContent":["define(['skylark-jquery'], function ($) {\n    'use strict';\n\n    return $;\n});"]}
