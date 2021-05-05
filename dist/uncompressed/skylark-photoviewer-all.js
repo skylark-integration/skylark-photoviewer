@@ -22117,13 +22117,228 @@ define('skylark-photoviewer/constants',[
         PUBLIC_VARS: PUBLIC_VARS
     };
 });
+define('skylark-domx-plugins-interact/polyfill',[],function(){
+
+});
+define('skylark-domx-plugins-interact/interact',[
+    "skylark-langx/skylark",
+    "./polyfill"
+], function(skylark) {
+
+	return skylark.attach("domx.interact",{});
+});
+
+
+define('skylark-domx-plugins-interact/movable',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins",
+    "./interact"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+    var Movable = plugins.Plugin.inherit({
+        klassName: "Movable",
+
+        pluginName : "lark.movable",
+
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+
+
+            function updateWithTouchData(e) {
+                var keys, i;
+
+                if (e.changedTouches) {
+                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
+                    for (i = 0; i < keys.length; i++) {
+                        e[keys[i]] = e.changedTouches[0][keys[i]];
+                    }
+                }
+            }
+
+            function updateWithMoveData(e) {
+                e.movable = self;
+                e.moveEl = elm;
+                e.handleEl = handleEl;
+            }
+
+            options = this.options;
+            var self = this,
+                handleEl = options.handle || elm,
+                auto = options.auto === false ? false : true,
+                constraints = options.constraints,
+                overlayDiv,
+                doc = options.document || document,
+                downButton,
+                start,
+                stop,
+                drag,
+                startX,
+                startY,
+                originalPos,
+                size,
+                startingCallback = options.starting,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped,
+
+                start = function(e) {
+                    var docSize = geom.getDocumentSize(doc),
+                        cursor;
+
+                    updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (startingCallback) {
+                        var ret = startingCallback(e)
+                        if ( ret === false) {
+                            return;
+                        } else if (langx.isPlainObject(ret)) {
+                            if (ret.constraints) {
+                                constraints = ret.constraints;
+                            }
+                            if (ret.started) {
+                                startedCallback = ret.started;
+                            }
+                            if (ret.moving) {
+                                movingCallback = ret.moving;
+                            }                            
+                            if (ret.stopped) {
+                                stoppedCallback = ret.stopped;
+                            }     
+                        }
+                    }
+
+                    e.preventDefault();
+
+                    downButton = e.button;
+                    //handleEl = getHandleEl();
+                    startX = e.screenX;
+                    startY = e.screenY;
+
+                    originalPos = geom.relativePosition(elm);
+                    size = geom.size(elm);
+
+                    // Grab cursor from handle so we can place it on overlay
+                    cursor = styler.css(handleEl, "curosr");
+
+                    overlayDiv = noder.createElement("div");
+                    styler.css(overlayDiv, {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: docSize.width,
+                        height: docSize.height,
+                        zIndex: 0x7FFFFFFF,
+                        opacity: 0.0001,
+                        cursor: cursor
+                    });
+                    noder.append(doc.body, overlayDiv);
+
+                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+
+                move = function(e) {
+                    updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (e.button !== 0) {
+                        return stop(e);
+                    }
+
+                    e.deltaX = e.screenX - startX;
+                    e.deltaY = e.screenY - startY;
+
+                    if (auto) {
+                        var l = originalPos.left + e.deltaX,
+                            t = originalPos.top + e.deltaY;
+                        if (constraints) {
+
+                            if (l < constraints.minX) {
+                                l = constraints.minX;
+                            }
+
+                            if (l > constraints.maxX) {
+                                l = constraints.maxX;
+                            }
+
+                            if (t < constraints.minY) {
+                                t = constraints.minY;
+                            }
+
+                            if (t > constraints.maxY) {
+                                t = constraints.maxY;
+                            }
+                        }
+                    }
+
+                    geom.relativePosition(elm, {
+                        left: l,
+                        top: t
+                    })
+
+                    e.preventDefault();
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+
+                stop = function(e) {
+                    updateWithTouchData(e);
+
+                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+
+                    noder.remove(overlayDiv);
+
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }
+                };
+
+            eventer.on(handleEl, "mousedown touchstart", start);
+
+            this._handleEl = handleEl;
+
+        },
+
+        remove : function() {
+            eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Movable,"movable");
+
+    return interact.Movable = Movable;
+});
+
 define('skylark-photoviewer/draggable',[
+    "skylark-domx-plugins-interact/movable",
     './domq',
     './constants'
-], function ($, Constants) {
+], function (_movable,$, Constants) {
     'use strict';
     return {
         draggable(modal, dragHandle, dragCancel) {
+            /*
             let isDragging = false;
             let startX = 0;
             let startY = 0;
@@ -22165,17 +22380,22 @@ define('skylark-photoviewer/draggable',[
                 isDragging = false;
             };
             $(dragHandle).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
+            */
+            _movable($(modal)[0]);
         }
     };
 });
 define('skylark-photoviewer/movable',[
+    "skylark-domx-eventer",
+    "skylark-domx-plugins-interact/movable",
     './domq',
     './constants'
-], function ($, Constants) {
+], function (eventer,_movable,$, Constants) {
     'use strict';
     const ELEMS_WITH_GRABBING_CURSOR = `html, body, .${ Constants.NS }-modal, .${ Constants.NS }-stage, .${ Constants.NS }-button, .${ Constants.NS }-resizable-handle`;
     return {
         movable(stage, image) {
+            /*
             let isDragging = false;
             let startX = 0;
             let startY = 0;
@@ -22250,6 +22470,50 @@ define('skylark-photoviewer/movable',[
                 $(ELEMS_WITH_GRABBING_CURSOR).removeClass('is-grabbing');
             };
             $(stage).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
+            */
+            
+            
+
+            return _movable(image[0],{
+                starting : function(e) {
+                    if (stage.hasClass('is-grab')) {
+
+                    } else {
+                        return false;
+                    }
+                    const imageWidth = $(image).width();
+                    const imageHeight = $(image).height();
+                    const stageWidth = $(stage).width();
+                    const stageHeight = $(stage).height();
+                    let minX,minY,maxX,maxY;
+
+                    if (stageWidth>=imageWidth) {
+                        minX=maxX=(stageWidth-imageWidth) / 2;
+                    } else {
+                        minX = stageWidth - imageWidth;
+                        maxX = 0;
+                    }
+
+                    if (stageHeight>=imageHeight) {
+                        minY=maxY=(stageHeight-imageHeight) / 2;
+                    } else {
+                        minY = stageHeight - imageHeight;
+                        maxY = 0;
+                    }
+
+                    return {
+                        constraints : {
+                             minX,
+                            maxX,
+                            minY,
+                            maxY
+                        }
+                    };
+                },
+                started : function(e) {
+                    eventer.stop(e);
+                }
+            });
         }
     };
 });

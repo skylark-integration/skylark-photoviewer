@@ -1,10 +1,12 @@
 define([
+    "skylark-domx-plugins-interact/movable",
     './domq',
     './constants'
-], function ($, Constants) {
+], function (_movable,$, Constants) {
     'use strict';
     return {
         draggable(modal, dragHandle, dragCancel) {
+            /*
             let isDragging = false;
             let startX = 0;
             let startY = 0;
@@ -46,6 +48,8 @@ define([
                 isDragging = false;
             };
             $(dragHandle).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
+            */
+            _movable($(modal)[0]);
         }
     };
 });

@@ -227,6 +227,11 @@ requirejs.config({
             main: 'main'
           },
           {
+            name: 'skylark-domx-plugins-interact',
+            location : "../node_modules/skylark-domx-plugins-interact/dist/uncompressed/skylark-domx-plugins-interact",
+            main: 'main'
+          },
+          {
             name: 'skylark-domx-plugins-toggles',
             location : "../node_modules/skylark-domx-plugins-toggles/dist/uncompressed/skylark-domx-plugins-toggles",
             main: 'main'

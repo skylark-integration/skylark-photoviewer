@@ -28,6 +28,7 @@
   "license": "MIT",
   "dependencies": {
     "skylark-bootstrap3": "git+https://github.com/skylark-integration/skylark-bootstrap3.git#master",
+    "skylark-domx-plugins-interact": "git+https://github.com/skylark-domx-plugins/skylark-domx-plugins-interact.git#master",
     "skylark-domx-images": "git+https://github.com/skylark-domx/skylark-domx-images.git#master",
     "skylark-jquery": "git+https://github.com/skylark-integration/skylark-jquery.git#master",
     "skylark-langx": "git+https://github.com/skylark-langx/skylark-langx.git#master"

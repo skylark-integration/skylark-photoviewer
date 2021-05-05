@@ -1,11 +1,14 @@
 define([
+    "skylark-domx-eventer",
+    "skylark-domx-plugins-interact/movable",
     './domq',
     './constants'
-], function ($, Constants) {
+], function (eventer,_movable,$, Constants) {
     'use strict';
     const ELEMS_WITH_GRABBING_CURSOR = `html, body, .${ Constants.NS }-modal, .${ Constants.NS }-stage, .${ Constants.NS }-button, .${ Constants.NS }-resizable-handle`;
     return {
         movable(stage, image) {
+            /*
             let isDragging = false;
             let startX = 0;
             let startY = 0;
@@ -80,6 +83,50 @@ define([
                 $(ELEMS_WITH_GRABBING_CURSOR).removeClass('is-grabbing');
             };
             $(stage).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
+            */
+            
+            
+
+            return _movable(image[0],{
+                starting : function(e) {
+                    if (stage.hasClass('is-grab')) {
+
+                    } else {
+                        return false;
+                    }
+                    const imageWidth = $(image).width();
+                    const imageHeight = $(image).height();
+                    const stageWidth = $(stage).width();
+                    const stageHeight = $(stage).height();
+                    let minX,minY,maxX,maxY;
+
+                    if (stageWidth>=imageWidth) {
+                        minX=maxX=(stageWidth-imageWidth) / 2;
+                    } else {
+                        minX = stageWidth - imageWidth;
+                        maxX = 0;
+                    }
+
+                    if (stageHeight>=imageHeight) {
+                        minY=maxY=(stageHeight-imageHeight) / 2;
+                    } else {
+                        minY = stageHeight - imageHeight;
+                        maxY = 0;
+                    }
+
+                    return {
+                        constraints : {
+                             minX,
+                            maxX,
+                            minY,
+                            maxY
+                        }
+                    };
+                },
+                started : function(e) {
+                    eventer.stop(e);
+                }
+            });
         }
     };
 });
