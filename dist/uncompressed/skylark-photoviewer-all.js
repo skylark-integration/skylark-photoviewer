@@ -22125,7 +22125,7 @@ define('skylark-domx-plugins-interact/interact',[
     "./polyfill"
 ], function(skylark) {
 
-	return skylark.attach("domx.interact",{});
+	return skylark.attach("domx.plugins.interact",{});
 });
 
 
@@ -22235,7 +22235,7 @@ define('skylark-domx-plugins-interact/movable',[
                     size = geom.size(elm);
 
                     // Grab cursor from handle so we can place it on overlay
-                    cursor = styler.css(handleEl, "curosr");
+                    cursor = styler.css(handleEl, "cursor");
 
                     overlayDiv = noder.createElement("div");
                     styler.css(overlayDiv, {
@@ -22531,15 +22531,415 @@ define('skylark-photoviewer/movable',[
         }
     };
 });
+define('skylark-domx-plugins-interact/Movable',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins",
+    "./interact"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+    var Movable = plugins.Plugin.inherit({
+        klassName: "Movable",
+
+        pluginName : "lark.movable",
+
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+
+
+            function updateWithTouchData(e) {
+                var keys, i;
+
+                if (e.changedTouches) {
+                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
+                    for (i = 0; i < keys.length; i++) {
+                        e[keys[i]] = e.changedTouches[0][keys[i]];
+                    }
+                }
+            }
+
+            function updateWithMoveData(e) {
+                e.movable = self;
+                e.moveEl = elm;
+                e.handleEl = handleEl;
+            }
+
+            options = this.options;
+            var self = this,
+                handleEl = options.handle || elm,
+                auto = options.auto === false ? false : true,
+                constraints = options.constraints,
+                overlayDiv,
+                doc = options.document || document,
+                downButton,
+                start,
+                stop,
+                drag,
+                startX,
+                startY,
+                originalPos,
+                size,
+                startingCallback = options.starting,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped,
+
+                start = function(e) {
+                    var docSize = geom.getDocumentSize(doc),
+                        cursor;
+
+                    updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (startingCallback) {
+                        var ret = startingCallback(e)
+                        if ( ret === false) {
+                            return;
+                        } else if (langx.isPlainObject(ret)) {
+                            if (ret.constraints) {
+                                constraints = ret.constraints;
+                            }
+                            if (ret.started) {
+                                startedCallback = ret.started;
+                            }
+                            if (ret.moving) {
+                                movingCallback = ret.moving;
+                            }                            
+                            if (ret.stopped) {
+                                stoppedCallback = ret.stopped;
+                            }     
+                        }
+                    }
+
+                    e.preventDefault();
+
+                    downButton = e.button;
+                    //handleEl = getHandleEl();
+                    startX = e.screenX;
+                    startY = e.screenY;
+
+                    originalPos = geom.relativePosition(elm);
+                    size = geom.size(elm);
+
+                    // Grab cursor from handle so we can place it on overlay
+                    cursor = styler.css(handleEl, "cursor");
+
+                    overlayDiv = noder.createElement("div");
+                    styler.css(overlayDiv, {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: docSize.width,
+                        height: docSize.height,
+                        zIndex: 0x7FFFFFFF,
+                        opacity: 0.0001,
+                        cursor: cursor
+                    });
+                    noder.append(doc.body, overlayDiv);
+
+                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+
+                move = function(e) {
+                    updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (e.button !== 0) {
+                        return stop(e);
+                    }
+
+                    e.deltaX = e.screenX - startX;
+                    e.deltaY = e.screenY - startY;
+
+                    if (auto) {
+                        var l = originalPos.left + e.deltaX,
+                            t = originalPos.top + e.deltaY;
+                        if (constraints) {
+
+                            if (l < constraints.minX) {
+                                l = constraints.minX;
+                            }
+
+                            if (l > constraints.maxX) {
+                                l = constraints.maxX;
+                            }
+
+                            if (t < constraints.minY) {
+                                t = constraints.minY;
+                            }
+
+                            if (t > constraints.maxY) {
+                                t = constraints.maxY;
+                            }
+                        }
+                    }
+
+                    geom.relativePosition(elm, {
+                        left: l,
+                        top: t
+                    })
+
+                    e.preventDefault();
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+
+                stop = function(e) {
+                    updateWithTouchData(e);
+
+                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+
+                    noder.remove(overlayDiv);
+
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }
+                };
+
+            eventer.on(handleEl, "mousedown touchstart", start);
+
+            this._handleEl = handleEl;
+
+        },
+
+        remove : function() {
+            eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Movable,"movable");
+
+    return interact.Movable = Movable;
+});
+
+define('skylark-domx-plugins-interact/resizable',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-query",
+    "skylark-domx-plugins",
+    "./interact",
+    "./Movable"
+],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+
+    var Resizable = plugins.Plugin.inherit({
+        klassName: "Resizable",
+
+        "pluginName" : "lark.resizable",
+        
+        options : {
+            // prevents browser level actions like forward back gestures
+            touchActionNone: true,
+            // selector for handle that starts dragging
+            handle : {
+                border : {
+                    directions : {
+                        top: true, //n
+                        left: true, //w
+                        right: true, //e
+                        bottom: true, //s
+                        topLeft : true, // nw
+                        topRight : true, // ne
+                        bottomLeft : true, // sw
+                        bottomRight : true // se                         
+                    },
+                    classes : {
+                        all : "resizable-handle",
+                        top : "resizable-handle-n",
+                        left: "resizable-handle-w",
+                        right: "resizable-handle-e",
+                        bottom: "resizable-handle-s", 
+                        topLeft : "resizable-handle-nw", 
+                        topRight : "resizable-handle-ne",
+                        bottomLeft : "resizable-handle-sw",             
+                        bottomRight : "resizable-handle-se"                         
+                    }
+                },
+                grabber: {
+                    selector : "",
+                    direction : "bottomRight"
+                },
+                selector: true
+            },
+
+            constraints : {
+                minWidth : null,
+                minHeight : null,
+                maxWidth : null,
+                maxHeight : null
+            }
+        },
+
+        _construct :function (elm, options) {
+            this.overrided(elm,options);
+
+
+            options = this.options;
+            var handle = options.handle || {},
+                constraints = options.constraints || {},
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped;
+
+            if (langx.isString(handle)) {
+                handleEl = finder.find(elm,handle);
+            } else if (langx.isHtmlNode(handle)) {
+                handleEl = handle;
+            }
+
+            function handleResize(handleEl,dir) {
+                let  startRect;
+
+                Movable(handleEl,{
+                    auto : false,
+                    started : function(e) {
+                        startRect = geom.relativeRect(elm);
+                        if (startedCallback) {
+                            startedCallback(e);
+                        }
+                    },
+                    moving : function(e) {
+                        currentRect = {
+                        };
+                        if (dir == "right" || dir == "topRight" || dir == "bottomRight" ) {
+                            currentRect.width = startRect.width + e.deltaX;
+                            if (constraints.minWidth && currentRect.width < constraints.minWidth) {
+                                currentRect.width = constraints.minWidth;
+                            }
+                            if (constraints.maxWidth && currentRect.width > constraints.maxWidth) {
+                                currentRect.width = constraints.maxWidth;
+                            }
+                        } 
+
+                        if (dir == "bottom" || dir == "bottomLeft" || dir == "bottomRight" ) {
+                            currentRect.height = startRect.height + e.deltaY;
+                            if (constraints.minHeight && currentRect.height < constraints.minHeight) {
+                                currentRect.height = constraints.minHeight;
+                            }
+                            if (constraints.maxHeight && currentRect.height > constraints.maxHeight) {
+                                currentRect.height = constraints.maxHeight;
+                            }
+                        } 
+
+                        if (dir == "left" || dir == "topLeft" || dir == "bottomLeft" ) {
+                            currentRect.left = startRect.left + e.deltaX;
+                            currentRect.width = startRect.width - e.deltaX;
+                            if (constraints.minWidth && currentRect.width < constraints.minWidth) {
+                                currentRect.left = currentRect.left + currentRect.width - constraints.minWidth;
+                                currentRect.width = constraints.minWidth;
+                            }
+                            if (constraints.maxWidth && currentRect.width > constraints.maxWidth) {
+                                currentRect.left = currentRect.left + currentRect.width - constraints.maxWidth;
+                                currentRect.width = constraints.maxWidth;
+                            }
+                        } 
+
+                        if (dir == "top" || dir == "topLeft" || dir == "topRight" ) {
+                            currentRect.top = startRect.top + e.deltaY;
+                            currentRect.height = startRect.height - e.deltaY;
+                            if (constraints.minHeight && currentRect.height < constraints.minHeight) {
+                                currentRect.top = currentRect.top + currentRect.height - constraints.minHeight;
+                                currentRect.height = constraints.minHeight;
+                            }
+                            if (constraints.maxHeight && currentRect.height > constraints.maxHeight) {
+                                currentRect.top = currentRect.top + currentRect.height - constraints.maxHeight;
+                                currentRect.height = constraints.maxHeight;
+                            }
+                        } 
+
+                        geom.relativeRect(elm,currentRect);
+
+                        if (movingCallback) {
+                            movingCallback(e);
+                        }
+                    },
+                    stopped: function(e) {
+                        if (stoppedCallback) {
+                            stoppedCallback(e);
+                        }                
+                    }
+                });
+            }
+
+            if (handle && handle.border) {
+                let borders = []
+                for (var dir in handle.border.directions) {
+                    if (handle.border.directions[dir]) {
+                        let handleEl = noder.createElement("div",{
+                            "className": handle.border.classes.all + " " + handle.border.classes[dir],
+                            "direction" : dir
+                        },elm);   
+                        handleResize(handleEl,dir) ; 
+
+                    }
+
+                }
+            }
+
+            if (handle && handle.grabber && handle.grabber.selector) {
+                 let handleEl = finder.find(elm,handle.grabber.selector);
+                 handleResize(handleEl,handle.grabber.direction) ; 
+            }
+
+        },
+
+        // destroys the dragger.
+        remove: function() {
+            eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Resizable,"resizable");
+
+    return interact.Resizable = Resizable;
+});
+
 define('skylark-photoviewer/resizable',[
+    "skylark-domx-eventer",
+    "skylark-domx-plugins-interact/resizable",
     './domq',
     './constants',
     './utilities'
-], function ($, Constants, Utilities) {
+], function (eventer,_Resizable,$, Constants, Utilities) {
     'use strict';
     const ELEMS_WITH_RESIZE_CURSOR = `html, body, .${ Constants.NS }-modal, .${ Constants.NS }-stage, .${ Constants.NS }-button`;
     return {
         resizable(modal, stage, image, minWidth, minHeight) {
+            /*
             const resizableHandleE = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-e"></div>`);
             const resizableHandleW = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-w"></div>`);
             const resizableHandleS = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-s"></div>`);
@@ -22727,6 +23127,57 @@ define('skylark-photoviewer/resizable',[
                 handle.on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, function (e) {
                     dragStart(dir, e);
                 });
+            });
+            */
+            let self = this;
+            let resizer = new _Resizable($(modal)[0],{
+                handle : {
+                    border : {
+                        directions : {
+                            top: true, //n
+                            left: true, //w
+                            right: true, //e
+                            bottom: true, //s
+                            topLeft : true, // nw
+                            topRight : true, // ne
+                            bottomLeft : true, // sw
+                            bottomRight : true // se                         
+                        },
+                        classes : {
+                            all : `${ Constants.NS }-resizable-handle`,
+                            top : `${ Constants.NS }-resizable-handle-n`,
+                            left: `${ Constants.NS }-resizable-handle-w`,
+                            right: `${ Constants.NS }-resizable-handle-e`,
+                            bottom: `${ Constants.NS }-resizable-handle-s`, 
+                            topLeft : `${ Constants.NS }-resizable-handle-nw`, 
+                            topRight : `${ Constants.NS }-resizable-handle-ne`,
+                            bottomLeft : `${ Constants.NS }-resizable-handle-sw`,             
+                            bottomRight : `${ Constants.NS }-resizable-handle-se`                         
+                        }                        
+                    }
+                },
+                constraints : {
+                    minWidth,
+                    minHeight
+                },
+                started : function(){
+                    Constants.PUBLIC_VARS['isResizing'] = true;
+                },
+                moving : function(e) {
+                    const imageWidth = $(image).width();
+                    const imageHeight = $(image).height();
+                    const stageWidth = $(stage).width();
+                    const stageHeight = $(stage).height();
+                    const left = (stageWidth - imageWidth) /2;
+                    const top = (stageHeight- imageHeight) /2;
+                    $(image).css({
+                        left,
+                        top
+                    });
+                },
+                stopped :function () {
+                    Constants.PUBLIC_VARS['isResizing'] = false;
+                }
             });
         }
     };

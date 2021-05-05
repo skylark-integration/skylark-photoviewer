@@ -1,12 +1,15 @@
 define([
+    "skylark-domx-eventer",
+    "skylark-domx-plugins-interact/resizable",
     './domq',
     './constants',
     './utilities'
-], function ($, Constants, Utilities) {
+], function (eventer,_Resizable,$, Constants, Utilities) {
     'use strict';
     const ELEMS_WITH_RESIZE_CURSOR = `html, body, .${ Constants.NS }-modal, .${ Constants.NS }-stage, .${ Constants.NS }-button`;
     return {
         resizable(modal, stage, image, minWidth, minHeight) {
+            /*
             const resizableHandleE = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-e"></div>`);
             const resizableHandleW = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-w"></div>`);
             const resizableHandleS = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-s"></div>`);
@@ -194,6 +197,57 @@ define([
                 handle.on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, function (e) {
                     dragStart(dir, e);
                 });
+            });
+            */
+            let self = this;
+            let resizer = new _Resizable($(modal)[0],{
+                handle : {
+                    border : {
+                        directions : {
+                            top: true, //n
+                            left: true, //w
+                            right: true, //e
+                            bottom: true, //s
+                            topLeft : true, // nw
+                            topRight : true, // ne
+                            bottomLeft : true, // sw
+                            bottomRight : true // se                         
+                        },
+                        classes : {
+                            all : `${ Constants.NS }-resizable-handle`,
+                            top : `${ Constants.NS }-resizable-handle-n`,
+                            left: `${ Constants.NS }-resizable-handle-w`,
+                            right: `${ Constants.NS }-resizable-handle-e`,
+                            bottom: `${ Constants.NS }-resizable-handle-s`, 
+                            topLeft : `${ Constants.NS }-resizable-handle-nw`, 
+                            topRight : `${ Constants.NS }-resizable-handle-ne`,
+                            bottomLeft : `${ Constants.NS }-resizable-handle-sw`,             
+                            bottomRight : `${ Constants.NS }-resizable-handle-se`                         
+                        }                        
+                    }
+                },
+                constraints : {
+                    minWidth,
+                    minHeight
+                },
+                started : function(){
+                    Constants.PUBLIC_VARS['isResizing'] = true;
+                },
+                moving : function(e) {
+                    const imageWidth = $(image).width();
+                    const imageHeight = $(image).height();
+                    const stageWidth = $(stage).width();
+                    const stageHeight = $(stage).height();
+                    const left = (stageWidth - imageWidth) /2;
+                    const top = (stageHeight- imageHeight) /2;
+                    $(image).css({
+                        left,
+                        top
+                    });
+                },
+                stopped :function () {
+                    Constants.PUBLIC_VARS['isResizing'] = false;
+                }
             });
         }
     };
