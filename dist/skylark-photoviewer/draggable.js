@@ -5,5 +5,5 @@
  * @link https://github.com/skylark-integration/skylark-photoviewer/
  * @license MIT
  */
-define(["skylark-domx-plugins-interact/movable","./domq","./constants"],function(n,t,e){"use strict";return{draggable(e,a,r){n(t(e)[0])}}});
+define(["skylark-domx-plugins-interact/movable","./domq","./constants"],function(t,n,e){"use strict";return{draggable(i,s,a){var r=this;t(n(i)[0],{handle:n(s)[0],starting:function(t){return!n(t.target).closest(a).length&&(!e.PUBLIC_VARS.isResizing&&!r.isMaximized)}})}}});
 //# sourceMappingURL=sourcemaps/draggable.js.map

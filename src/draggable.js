@@ -49,7 +49,21 @@ define([
             };
             $(dragHandle).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
             */
-            _movable($(modal)[0]);
+            var self = this;
+            _movable($(modal)[0],{
+                handle : $(dragHandle)[0],
+                starting : function(e) {
+                    const elemCancel = $(e.target).closest(dragCancel);
+                    if (elemCancel.length) {
+                        return false;
+                    }
+                    if (Constants.PUBLIC_VARS['isResizing'] || self.isMaximized) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            });
         }
     };
 });

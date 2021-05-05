@@ -22381,7 +22381,21 @@ define('skylark-photoviewer/draggable',[
             };
             $(dragHandle).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
             */
-            _movable($(modal)[0]);
+            var self = this;
+            _movable($(modal)[0],{
+                handle : $(dragHandle)[0],
+                starting : function(e) {
+                    const elemCancel = $(e.target).closest(dragCancel);
+                    if (elemCancel.length) {
+                        return false;
+                    }
+                    if (Constants.PUBLIC_VARS['isResizing'] || self.isMaximized) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            });
         }
     };
 });
@@ -23236,58 +23250,68 @@ define('skylark-photoviewer/core',[
             const ctrlKey = e.ctrlKey || e.metaKey;
             const altKey = e.altKey || e.metaKey;
             switch (keyCode) {
-            case 37:
-                this.jump(-1);
-                break;
-            case 39:
-                this.jump(1);
-                break;
-            case 187:
-                this.zoom(this.options.ratioThreshold * 3, {
-                    x: this.$stage.width() / 2,
-                    y: this.$stage.height() / 2
-                }, e);
-                break;
-            case 189:
-                this.zoom(-this.options.ratioThreshold * 3, {
-                    x: this.$stage.width() / 2,
-                    y: this.$stage.height() / 2
-                }, e);
-                break;
-            case 61:
-                this.zoom(this.options.ratioThreshold * 3, {
-                    x: this.$stage.width() / 2,
-                    y: this.$stage.height() / 2
-                }, e);
-                break;
-            case 173:
-                this.zoom(-this.options.ratioThreshold * 3, {
-                    x: this.$stage.width() / 2,
-                    y: this.$stage.height() / 2
-                }, e);
-                break;
-            case 48:
-                if (ctrlKey && altKey) {
-                    this.zoomTo(1, {
+                // ←
+                case 37:
+                    this.jump(-1);
+                    break;
+                // →
+                case 39:
+                    this.jump(1);
+                    break;
+                // +
+                case 187:
+                    this.zoom(this.options.ratioThreshold * 3, {
                         x: this.$stage.width() / 2,
                         y: this.$stage.height() / 2
                     }, e);
-                }
-                break;
-            case 188:
-                if (ctrlKey) {
-                    this.rotate(-90);
-                }
-                break;
-            case 190:
-                if (ctrlKey) {
-                    this.rotate(90);
-                }
-                break;
-            case 81:
-                this.close();
-                break;
-            default:
+                    break;
+                // -
+                case 189:
+                    this.zoom(-this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    break;
+                // + Firefox
+                case 61:
+                    this.zoom(this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    break;
+                // - Firefox
+                case 173:
+                    this.zoom(-this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    break;
+                // Ctrl + Alt + 0
+                case 48:
+                    if (ctrlKey && altKey) {
+                        this.zoomTo(1, {
+                            x: this.$stage.width() / 2,
+                            y: this.$stage.height() / 2
+                        }, e);
+                    }
+                    break;
+                // Ctrl + ,
+                case 188:
+                    if (ctrlKey) {
+                        this.rotate(-90);
+                    }
+                    break;
+                // Ctrl + .
+                case 190:
+                    if (ctrlKey) {
+                        this.rotate(90);
+                    }
+                    break;
+                // Q
+                case 81:
+                    this.close();
+                    break;
+                default:
             }
         }
         _addEvents() {
