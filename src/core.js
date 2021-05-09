@@ -1,11 +1,11 @@
 define([
     "skylark-domx-plugins-pictures/viewer",
+    "skylark-domx-plugins-windows/window",
     './domq',
     './defaults',
     './constants',
-    './utilities',
-    "./window",
-], function (Imager,$, DEFAULTS, Constants, Utilities, Window) {
+    './utilities'
+], function (Imager,Window,$, DEFAULTS, Constants, Utilities) {
     'use strict';
 
     
@@ -132,8 +132,48 @@ define([
             $(this.options.appendTo).eq(0).append(this.$photoviewer);
 
             this._window = new Window(this.$photoviewer[0],{
-                dragHandle : this.options.dragHandle,
+                selectors : {
+                    headerPane  : "",
+                    contentPane : "",
+                    footerPane  : "",
+                    titlebar : "",
+                    buttons : {
+                        "fullscreen" : ".photoviewer-button-fullscreen",
+                        "maximize" : ".photoviewer-button-maximize",
+                        "minimize" : ".photoviewer-button-minimize",     
+                        "close" : ".photoviewer-button-close"
+                    }
+                },
+                classes : {
+                    "maximize" : Constants.NS + '-maximize',
+                },
+                fixedContent: true,
+                initMaximized: false,
 
+
+
+                movable : {
+
+                    dragHandle: this.options.dragHandle,
+                    dragCancel: Constants.CLASS_NS + '-button'
+                },
+                resizable : {
+                    minWidth: 320,
+                    minHeight: 320,
+                    border : {
+                        classes :  {
+                            all : `${ Constants.NS }-resizable-handle`,
+                            top : `${ Constants.NS }-resizable-handle-n`,
+                            left: `${ Constants.NS }-resizable-handle-w`,
+                            right: `${ Constants.NS }-resizable-handle-e`,
+                            bottom: `${ Constants.NS }-resizable-handle-s`, 
+                            topLeft : `${ Constants.NS }-resizable-handle-nw`, 
+                            topRight : `${ Constants.NS }-resizable-handle-ne`,
+                            bottomLeft : `${ Constants.NS }-resizable-handle-sw`,             
+                            bottomRight : `${ Constants.NS }-resizable-handle-se`   
+                        }
+                    }
+                }
             });
             this._imager = new Imager(this.$stage[0],{
                 ratioThreshold: this.options.ratioThreshold,

@@ -252,6 +252,11 @@ requirejs.config({
             main: 'main'
           },
           {
+            name: 'skylark-domx-plugins-windows',
+            location : "../node_modules/skylark-domx-plugins-windows/dist/uncompressed/skylark-domx-plugins-windows",
+            main: 'main'
+          },
+          {
             name: 'skylark-bootstrap3',
             location : "../node_modules/skylark-bootstrap3/dist/uncompressed/skylark-bootstrap3",
             main: 'main'
