@@ -1,11 +1,11 @@
 define([
+    "skylark-domx-plugins-pictures/viewer",
     './domq',
     './defaults',
     './constants',
     './utilities',
     "./window",
-    "./picture_viewer"
-], function ($, DEFAULTS, Constants, Utilities, Window,Imager) {
+], function (Imager,$, DEFAULTS, Constants, Utilities, Window) {
     'use strict';
 
     
@@ -135,7 +135,17 @@ define([
                 dragHandle : this.options.dragHandle,
 
             });
-            this._imager = new Imager(this.$stage[0]);
+            this._imager = new Imager(this.$stage[0],{
+                ratioThreshold: this.options.ratioThreshold,
+                minRatio: this.options.minRatio,
+                maxRatio: this.options.maxRatio,
+                movable : true,
+
+                classes : {
+                    grab : "is-grab",
+                    loader : "${ Constants.NS }-loader"
+                }                
+            });
 
             this._addEvents();
             this._addCustomButtonEvents();

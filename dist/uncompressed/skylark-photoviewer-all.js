@@ -10584,6 +10584,14 @@ define('skylark-langx/langx',[
 
     return skylark.langx = langx;
 });
+define('skylark-langx/main',[
+    "./langx"
+], function(langx) {
+    return langx;
+});
+
+define('skylark-langx', ['skylark-langx/main'], function (main) { return main; });
+
 define('skylark-domx-browser/browser',[
     "skylark-langx/skylark",
     "skylark-langx/langx"
@@ -15751,369 +15759,11 @@ define('skylark-domx-eventer/main',[
 });
 define('skylark-domx-eventer', ['skylark-domx-eventer/main'], function (main) { return main; });
 
-define('skylark-domx-forms/forms',[
-	"skylark-langx/skylark"
-],function(skylark){
-	return skylark.attach("domx.forms",{});
-});
-define('skylark-domx-forms/deserialize',[
-  "skylark-langx/langx",
-  "skylark-domx-query",
-  "./forms"
-],function(langx,$,forms){
-  /**
-   * Updates a key/valueArray with the given property and value. Values will always be stored as arrays.
-   *
-   * @param prop The property to add the value to.
-   * @param value The value to add.
-   * @param obj The object to update.
-   * @returns {object} Updated object.
-   */
-  function updateKeyValueArray( prop, value, obj ) {
-    var current = obj[ prop ];
-
-    if ( current === undefined ) {
-      obj[ prop ] = [ value ];
-    } else {
-      current.push( value );
-    }
-
-    return obj;
-  }
-
-  /**
-   * Get all of the fields contained within the given elements by name.
-   *
-   * @param formElm The form element.
-   * @param filter Custom filter to apply to the list of fields.
-   * @returns {object} All of the fields contained within the given elements, keyed by name.
-   */
-  function getFieldsByName(formElm, filter ) {
-    var elementsByName = {};
-
-    // Extract fields from elements
-    var fields = $(formElm)
-      .map(function convertFormToElements() {
-        return this.elements ? langx.makeArray( this.elements ) : this;
-      })
-      .filter( filter || ":input:not(:disabled)" )
-      .get();
-
-    langx.each( fields, function( index, field ) {
-      updateKeyValueArray( field.name, field, elementsByName );
-    });
-
-    return elementsByName;
-  }
-
-  /**
-   * Figure out the type of an element. Input type will be used first, falling back to nodeName.
-   *
-   * @param element DOM element to check type of.
-   * @returns {string} The element's type.
-   */
-  function getElementType( element ) {
-    return ( element.type || element.nodeName ).toLowerCase();
-  }
-
-  /**
-   * Normalize the provided data into a key/valueArray store.
-   *
-   * @param data The data provided by the user to the plugin.
-   * @returns {object} The data normalized into a key/valueArray store.
-   */
-  function normalizeData( data ) {
-    var normalized = {};
-    var rPlus = /\+/g;
-
-    // Convert data from .serializeObject() notation
-    if ( langx.isPlainObject( data ) ) {
-      langx.extend( normalized, data );
-
-      // Convert non-array values into an array
-      langx.each( normalized, function( name, value ) {
-        if ( !langx.isArray( value ) ) {
-          normalized[ name ] = [ value ];
-        }
-      });
-
-    // Convert data from .serializeArray() notation
-    } else if ( langx.isArray( data ) ) {
-      langx.each( data, function( index, field ) {
-        updateKeyValueArray( field.name, field.value, normalized );
-      });
-
-    // Convert data from .serialize() notation
-    } else if ( typeof data === "string" ) {
-      langx.each( data.split( "&" ), function( index, field ) {
-        var current = field.split( "=" );
-        var name = decodeURIComponent( current[ 0 ].replace( rPlus, "%20" ) );
-        var value = decodeURIComponent( current[ 1 ].replace( rPlus, "%20" ) );
-        updateKeyValueArray( name, value, normalized );
-      });
-    }
-
-    return normalized;
-  }
-
-  /**
-   * Map of property name -> element types.
-   *
-   * @type {object}
-   */
-  var updateTypes = {
-    checked: [
-      "radio",
-      "checkbox"
-    ],
-    selected: [
-      "option",
-      "select-one",
-      "select-multiple"
-    ],
-    value: [
-      "button",
-      "color",
-      "date",
-      "datetime",
-      "datetime-local",
-      "email",
-      "hidden",
-      "month",
-      "number",
-      "password",
-      "range",
-      "reset",
-      "search",
-      "submit",
-      "tel",
-      "text",
-      "textarea",
-      "time",
-      "url",
-      "week"
-    ]
-  };
-
-  /**
-   * Get the property to update on an element being updated.
-   *
-   * @param element The DOM element to get the property for.
-   * @returns The name of the property to update if element is supported, otherwise `undefined`.
-   */
-  function getPropertyToUpdate( element ) {
-    var type = getElementType( element );
-    var elementProperty = undefined;
-
-    langx.each( updateTypes, function( property, types ) {
-      if ( langx.inArray( type, types ) > -1 ) {
-        elementProperty = property;
-        return false;
-      }
-    });
-
-    return elementProperty;
-  }
-
-  /**
-   * Update the element based on the provided data.
-   *
-   * @param element The DOM element to update.
-   * @param elementIndex The index of this element in the list of elements with the same name.
-   * @param value The serialized element value.
-   * @param valueIndex The index of the value in the list of values for elements with the same name.
-   * @param callback A function to call if the value of an element was updated.
-   */
-  function update( element, elementIndex, value, valueIndex, callback ) {
-    var property = getPropertyToUpdate( element );
-
-    // Handle value inputs
-    // If there are multiple value inputs with the same name, they will be populated by matching indexes.
-    if ( property == "value" && elementIndex == valueIndex ) {
-      element.value = value;
-      callback.call( element, value );
-
-    // Handle select menus, checkboxes and radio buttons
-    } else if ( property == "checked" || property == "selected" ) {
-      var fields = [];
-
-      // Extract option fields from select menus
-      if ( element.options ) {
-        langx.each( element.options, function( index, option ) {
-          fields.push( option );
-        });
-
-      } else {
-        fields.push( element );
-      }
-
-      // #37: Remove selection from multiple select menus before deserialization
-      if ( element.multiple && valueIndex == 0 ) {
-        element.selectedIndex = -1;
-      }
-
-      langx.each( fields, function( index, field ) {
-        if ( field.value == value ) {
-          field[ property ] = true;
-          callback.call( field, value );
-        }
-      });
-    }
-  }
-
-  /**
-   * Default plugin options.
-   *
-   * @type {object}
-   */
-  var defaultOptions = {
-    change: langx.noop,
-    complete: langx.noop
-  };
-
-  /**
-   * The $.deserialize function.
-   *
-   * @param data The data to deserialize.
-   * @param options Additional options.
-   * @returns {jQuery} The jQuery object that was provided to the plugin.
-   */
-  function deserialize(formElm,data, options ) {
-
-    // Backwards compatible with old arguments: data, callback
-    if ( langx.isFunction( options ) ) {
-      options = { complete: options };
-    }
-
-    options = langx.extend( defaultOptions, options || {} );
-    data = normalizeData( data );
-
-    var elementsByName = getFieldsByName( formElm, options.filter );
-
-    langx.each( data, function( name, values ) {
-      langx.each( elementsByName[ name ], function( elementIndex, element ) {
-        langx.each( values, function( valueIndex, value ) {
-          update( element, elementIndex, value, valueIndex, options.change );
-        });
-      });
-    });
-
-    options.complete.call( formElm );
-
-    return this;
-  };
-
-  return forms.deserialize = deserialize;
-});
-define('skylark-domx-forms/serializeArray',[
-  "skylark-langx/langx",
-  "skylark-domx-data",
-  "./forms"
-],function(langx,datax,forms){
-    function serializeArray(formElm) {
-        var name, type, result = [],
-            add = function(value) {
-                if (value.forEach) return value.forEach(add)
-                result.push({ name: name, value: value })
-            }
-        langx.each(formElm.elements, function(_, field) {
-            type = field.type, name = field.name
-            if (name && field.nodeName.toLowerCase() != 'fieldset' &&
-                !field.disabled && type != 'submit' && type != 'reset' && type != 'button' && type != 'file' &&
-                ((type != 'radio' && type != 'checkbox') || field.checked))
-                add(datax.val(field))
-        })
-        return result
-    };
-
-    return forms.serializeArray = serializeArray;
-});
-
-define('skylark-domx-forms/serializeObject',[
-  "skylark-langx/langx",
-  "./forms",
-  "./serializeArray"
-],function(langx,forms,serializeArray){
-
-  function serializeObject(formElm){
-    var obj = {};
-    
-    langx.each(serializeArray(formElm), function(i,o){
-      var n = o.name,
-        v = o.value;
-        
-        obj[n] = obj[n] === undefined ? v
-          : langx.isArray( obj[n] ) ? obj[n].concat( v )
-          : [ obj[n], v ];
-    });
-    
-    return obj;
-  }
-
-  return forms.serializeObject = serializeObject;
-});  
-define('skylark-domx-forms/serialize',[
-  "skylark-langx/langx",
-  "./forms",
-  "./serializeArray"
-],function(langx,forms,serializeArray){
-    function serialize(formElm) {
-        var result = []
-        serializeArray(formElm).forEach(function(elm) {
-            result.push(encodeURIComponent(elm.name) + '=' + encodeURIComponent(elm.value))
-        })
-        return result.join('&')
-    }
-
-    return forms.serialize = serialize;
-});
-define('skylark-domx-forms/main',[
-	"./forms",
-    "skylark-domx-velm",
-    "skylark-domx-query",
-    "./deserialize",
-    "./serializeArray",
-    "./serializeObject",
-    "./serialize"
-],function(forms,velm,$){
-
-    // from ./data
-    velm.delegate([
-        "deserialize",
-        "serializeArray",
-        "serializeObject",
-        "serialize"
-    ], forms);
-
-    $.fn.deserialize = $.wraps.wrapper_value(forms.deserialize, forms, forms.deserialize);
-    $.fn.serializeArray = $.wraps.wrapper_value(forms.serializeArray, forms, forms.serializeArray);
-    $.fn.serializeObject = $.wraps.wrapper_value(forms.serializeObject, forms, forms.serializeObject);
-    $.fn.serialize = $.wraps.wrapper_value(forms.serialize, forms, forms.serialize);
-
-
-	return forms;
-});
-define('skylark-domx-forms', ['skylark-domx-forms/main'], function (main) { return main; });
-
-define('skylark-domx-fx/fx',[
-    "skylark-langx/skylark",
-    "skylark-langx/langx"
-], function(skylark,langx) {
-
-    function fx() {
-        return fx;
-    }
-
-    langx.mixin(fx, {
-        off: false,
-        speeds: {
-            normal: 400,
-            fast: 200,
-            slow: 600
-        }
-    });
-
-    return skylark.attach("domx.fx", fx);
+define('skylark-domx/eventer',[
+    "skylark-domx-eventer"
+], function( eventer) {
+ 
+    return eventer;
 });
 define('skylark-domx-geom/geom',[
     "skylark-langx/skylark",
@@ -17394,6 +17044,38 @@ define('skylark-domx-geom/main',[
 });
 define('skylark-domx-geom', ['skylark-domx-geom/main'], function (main) { return main; });
 
+define('skylark-domx/geom',[
+    "skylark-domx-geom"
+], function( geom) {
+
+    return geom;
+});
+define('skylark-domx/data',[
+    "skylark-domx-data"
+], function( data) {
+ 
+    return data;
+});
+define('skylark-domx-fx/fx',[
+    "skylark-langx/skylark",
+    "skylark-langx/langx"
+], function(skylark,langx) {
+
+    function fx() {
+        return fx;
+    }
+
+    langx.mixin(fx, {
+        off: false,
+        speeds: {
+            normal: 400,
+            fast: 200,
+            slow: 600
+        }
+    });
+
+    return skylark.attach("domx.fx", fx);
+});
 define('skylark-domx-fx/animate',[
     "skylark-langx/langx",
     "skylark-domx-browser",
@@ -18553,6 +18235,1472 @@ define('skylark-domx-fx/main',[
 	return fx;
 });
 define('skylark-domx-fx', ['skylark-domx-fx/main'], function (main) { return main; });
+
+define('skylark-domx/fx',[
+    "skylark-domx-fx"
+], function( fx) {
+    return fx;
+});
+define('skylark-domx/styler',[
+    "skylark-domx-styler"
+], function( styler) {
+
+    return styler;
+});
+define('skylark-domx/query',[
+    "skylark-domx-query",
+    "./data",
+    "./eventer",
+    "./fx",
+    "./geom",
+    "./styler"
+], function( query) {
+
+    return query;
+
+});
+define('skylark-domx-images/images',[
+    "skylark-langx/skylark"
+], function(skylark) {
+
+  function images() {
+    return images;
+  }
+
+  return skylark.attach("domx.images" , images);
+});
+
+define('skylark-domx-images/isCompleted',[
+	"./images"
+],function(images){
+  function isCompleted(img) {
+     return img.complete && img.naturalWidth !== undefined;
+  }
+
+  return images.isCompleted = isCompleted;
+});
+define('skylark-domx-images/isLoaded',[
+	"./images"
+],function(images){
+
+  function isLoaded(img) {
+    return img.complete && img.naturalWidth !== 0;
+  }
+  return images.isLoaded = isLoaded;
+});
+define('skylark-domx-images/watch',[
+    "skylark-langx/langx",
+    "skylark-domx-eventer",
+    "./images",
+    "./isCompleted",
+    "./isLoaded"
+], function(langx,eventer,images,isCompleted,isLoaded) {
+
+  function watch(imgs) {
+    if (!langx.isArray(imgs)) {
+      imgs = [imgs];
+    }
+    var totalCount = imgs.length,
+        progressedCount = 0,
+        successedCount = 0,
+        faileredCount = 0,
+        d = new langx.Deferred();
+
+
+    function complete() {
+
+      d.resolve({
+        "total" : totalCount,
+        "successed" : successedCount,
+        "failered" : faileredCount,
+        "imgs" : imgs 
+      });
+    }
+
+    function progress(img,isLoaded) {
+
+      progressedCount++;
+      if (isLoaded) {
+        successedCount ++ ; 
+      } else {
+        faileredCount ++ ;
+      }
+
+      // progress event
+      d.progress({
+        "img" : img,
+        "isLoaded" : isLoaded,
+        "progressed" : progressedCount,
+        "total" : totalCount,
+        "imgs" : imgs 
+      });
+
+      // check if completed
+      if ( progressedCount == totalCount ) {
+        complete();
+      }
+    }
+
+    function check() {
+      if (!imgs.length ) {
+        complete();
+        return;
+      }
+
+      imgs.forEach(function(img) {
+        if (isCompleted(img)) {
+          progress(img,isLoaded(img));
+        } else {
+          eventer.on(img,{
+            "load" : function() {
+              progress(img,true);
+            },
+
+            "error" : function() {
+              progress(img,false);
+            }
+          });      
+        }
+      });
+    }
+
+    langx.defer(check);
+
+    d.promise.totalCount = totalCount;
+    return d.promise;
+  }
+
+
+
+  return images.watch = watch;
+});
+
+define('skylark-domx-images/preload',[
+    "skylark-langx/langx",
+	"./images",
+	"./watch"
+],function(langx,images,watch){
+  function preload(urls,options) {
+      if (langx.isString(urls)) {
+        urls = [urls];
+      }
+      var images = [];
+
+      urls.forEach(function(url){
+        var img = new Image();
+        img.src = url;
+        images.push(img);
+      });
+
+      return watch(images);
+  }
+
+  return images.preload = preload;
+});
+define('skylark-domx-plugins-base/plugins',[
+    "skylark-langx-ns",
+    "skylark-langx-types",
+    "skylark-langx-objects",
+    "skylark-langx-funcs",
+    "skylark-langx-events/Emitter",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-eventer",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-styler",
+    "skylark-domx-fx",
+    "skylark-domx-query",
+    "skylark-domx-velm"
+], function(
+    skylark,
+    types,
+    objects,
+    funcs,
+    Emitter, 
+    noder, 
+    datax, 
+    eventer, 
+    finder, 
+    geom, 
+    styler, 
+    fx, 
+    $, 
+    elmx
+) {
+    "use strict";
+
+    var slice = Array.prototype.slice,
+        concat = Array.prototype.concat,
+        pluginKlasses = {},
+        shortcuts = {};
+
+    /*
+     * Create or get or destory a plugin instance assocated with the element.
+     */
+    function instantiate(elm,pluginName,options) {
+        var pair = pluginName.split(":"),
+            instanceDataName = pair[1];
+        pluginName = pair[0];
+
+        if (!instanceDataName) {
+            instanceDataName = pluginName;
+        }
+
+        var pluginInstance = datax.data( elm, instanceDataName );
+
+        if (options === "instance") {
+            return pluginInstance;
+        } else if (options === "destroy") {
+            if (!pluginInstance) {
+                throw new Error ("The plugin instance is not existed");
+            }
+            pluginInstance.destroy();
+            //datax.removeData( elm, pluginName);
+            pluginInstance = undefined;
+        } else {
+            if (!pluginInstance) {
+                if (options !== undefined && typeof options !== "object") {
+                    throw new Error ("The options must be a plain object");
+                }
+                var pluginKlass = pluginKlasses[pluginName]; 
+                pluginInstance = new pluginKlass(elm,options);
+                datax.data( elm, instanceDataName,pluginInstance );
+            } else if (options) {
+                pluginInstance.reset(options);
+            }
+        }
+
+        return pluginInstance;
+    }
+
+
+    function shortcutter(pluginName,extfn) {
+       /*
+        * Create or get or destory a plugin instance assocated with the element,
+        * and also you can execute the plugin method directory;
+        */
+        return function (elm,options) {
+            var  plugin = instantiate(elm, pluginName,"instance");
+            if ( options === "instance" ) {
+              return plugin || null;
+            }
+
+            if (!plugin) {
+                plugin = instantiate(elm, pluginName,typeof options == 'object' && options || {});
+                if (typeof options != "string") {
+                  return this;
+                }
+            } 
+            if (options) {
+                var args = slice.call(arguments,1); //2
+                if (extfn) {
+                    return extfn.apply(plugin,args);
+                } else {
+                    if (typeof options == 'string') {
+                        var methodName = options;
+
+                        if ( !plugin ) {
+                            throw new Error( "cannot call methods on " + pluginName +
+                                " prior to initialization; " +
+                                "attempted to call method '" + methodName + "'" );
+                        }
+
+                        if ( !types.isFunction( plugin[ methodName ] ) || methodName.charAt( 0 ) === "_" ) {
+                            throw new Error( "no such method '" + methodName + "' for " + pluginName +
+                                " plugin instance" );
+                        }
+
+                        args = slice.call(args,1); //remove method name
+
+                        var ret = plugin[methodName].apply(plugin,args);
+                        if (ret == plugin) {
+                          ret = undefined;
+                        }
+
+                        return ret;
+                    }                
+                }                
+            }
+
+        }
+
+    }
+
+    /*
+     * Register a plugin type
+     */
+    function register( pluginKlass,shortcutName,instanceDataName,extfn) {
+        var pluginName = pluginKlass.prototype.pluginName;
+        
+        pluginKlasses[pluginName] = pluginKlass;
+
+        if (shortcutName) {
+            if (instanceDataName && types.isFunction(instanceDataName)) {
+                extfn = instanceDataName;
+                instanceDataName = null;
+            } 
+            if (instanceDataName) {
+                pluginName = pluginName + ":" + instanceDataName;
+            }
+
+            var shortcut = shortcuts[shortcutName] = shortcutter(pluginName,extfn);
+                
+            $.fn[shortcutName] = function(options) {
+                var returnValue = this;
+
+                if ( !this.length && options === "instance" ) {
+                  returnValue = undefined;
+                } else {
+                  var args = slice.call(arguments);
+                  this.each(function () {
+                    var args2 = slice.call(args);
+                    args2.unshift(this);
+                    var  ret  = shortcut.apply(undefined,args2);
+                    if (ret !== undefined) {
+                        returnValue = ret;
+                    }
+                  });
+                }
+
+                return returnValue;
+            };
+
+            elmx.partial(shortcutName,function(options) {
+                var  ret  = shortcut(this._elm,options);
+                if (ret === undefined) {
+                    ret = this;
+                }
+                return ret;
+            });
+
+        }
+    }
+
+    function parentClass(ctor){
+        if (ctor.hasOwnProperty("superclass")) {
+            return ctor.superclass;
+        }
+
+        return Object.getPrototypeOf(ctor);
+    }
+
+ 
+    var Plugin =   Emitter.inherit({
+        klassName: "Plugin",
+
+        _construct : function(elm,options) {
+           this._elm = elm;
+           this._initOptions(options);
+        },
+
+        _initOptions : function(options) {
+          var ctor = this.constructor,
+              cache = ctor.cache = (ctor.hasOwnProperty("cache") ? ctor.cache : {}),
+              defaults = cache.defaults;
+          if (!defaults) {
+            var  ctors = [];
+            do {
+              ctors.unshift(ctor);
+              if (ctor === Plugin) {
+                break;
+              }
+              ctor = parentClass(ctor);
+            } while (ctor);
+
+            defaults = cache.defaults = {};
+            for (var i=0;i<ctors.length;i++) {
+              ctor = ctors[i];
+              if (ctor.prototype.hasOwnProperty("options")) {
+                objects.mixin(defaults,ctor.prototype.options,true);
+              }
+              if (ctor.hasOwnProperty("options")) {
+                objects.mixin(defaults,ctor.options,true);
+              }
+            }
+          }
+          Object.defineProperty(this,"options",{
+            value :objects.mixin({},defaults,options,true)
+          });
+
+          //return this.options = langx.mixin({},defaults,options);
+          return this.options;
+        },
+
+
+        destroy: function() {
+
+            this._destroy();
+
+            // remove all event lisener
+            this.unlistenTo();
+            // remove data 
+            datax.removeData(this._elm,this.pluginName );
+        },
+
+        _destroy: funcs.noop,
+
+        _delay: function( handler, delay ) {
+            function handlerProxy() {
+                return ( typeof handler === "string" ? instance[ handler ] : handler )
+                    .apply( instance, arguments );
+            }
+            var instance = this;
+            return setTimeout( handlerProxy, delay || 0 );
+        },
+
+        elmx : function(elm) {
+            elm = elm || this._elm;
+            return elmx(elm);
+
+        },
+
+        $ : function(elm) {
+            elm = elm || this._elm;
+            return $(elm);
+        },
+
+        option: function( key, value ) {
+            var options = key;
+            var parts;
+            var curOption;
+            var i;
+
+            if ( arguments.length === 0 ) {
+
+                // Don't return a reference to the internal hash
+                return objects.mixin( {}, this.options );
+            }
+
+            if ( typeof key === "string" ) {
+
+                // Handle nested keys, e.g., "foo.bar" => { foo: { bar: ___ } }
+                options = {};
+                parts = key.split( "." );
+                key = parts.shift();
+                if ( parts.length ) {
+                    curOption = options[ key ] = objects.mixin( {}, this.options[ key ] );
+                    for ( i = 0; i < parts.length - 1; i++ ) {
+                        curOption[ parts[ i ] ] = curOption[ parts[ i ] ] || {};
+                        curOption = curOption[ parts[ i ] ];
+                    }
+                    key = parts.pop();
+                    if ( arguments.length === 1 ) {
+                        return curOption[ key ] === undefined ? null : curOption[ key ];
+                    }
+                    curOption[ key ] = value;
+                } else {
+                    if ( arguments.length === 1 ) {
+                        return this.options[ key ] === undefined ? null : this.options[ key ];
+                    }
+                    options[ key ] = value;
+                }
+            }
+
+            this._setOptions( options );
+
+            return this;
+        },
+
+        _setOptions: function( options ) {
+            var key;
+
+            for ( key in options ) {
+                this._setOption( key, options[ key ] );
+            }
+
+            return this;
+        },
+
+        _setOption: function( key, value ) {
+
+            this.options[ key ] = value;
+
+            return this;
+        },
+
+        getUID : function (prefix) {
+            prefix = prefix || "plugin";
+            do prefix += ~~(Math.random() * 1000000)
+            while (document.getElementById(prefix))
+            return prefix;
+        },
+
+        elm : function() {
+            return this._elm;
+        }
+
+    });
+
+    Plugin.instantiate = function(elm,options) {
+        return instantiate(elm,this.prototype.pluginName,options);
+    };
+    
+    $.fn.plugin = function(name,options) {
+        var args = slice.call( arguments, 1 ),
+            self = this,
+            returnValue ;
+
+        this.each(function(){
+            returnValue = instantiate.apply(self,[this,name].concat(args));
+        });
+        return returnValue;
+    };
+
+    elmx.partial("plugin",function(name,options) {
+        var args = slice.call( arguments, 1 );
+        return instantiate.apply(this,[this._elm,name].concat(args));
+    }); 
+
+
+    function plugins() {
+        return plugins;
+    }
+     
+    objects.mixin(plugins, {
+        instantiate,
+        Plugin,
+        register,
+        shortcuts
+    });
+
+    return  skylark.attach("domx.plugins",plugins);
+});
+define('skylark-domx-plugins-base/main',[
+	"./plugins"
+],function(plugins){
+	return plugins;
+});
+define('skylark-domx-plugins-base', ['skylark-domx-plugins-base/main'], function (main) { return main; });
+
+define('skylark-domx-plugins-interact/polyfill',[],function(){
+
+});
+define('skylark-domx-plugins-interact/interact',[
+    "skylark-langx/skylark",
+    "./polyfill"
+], function(skylark) {
+
+	return skylark.attach("domx.plugins.interact",{});
+});
+
+
+define('skylark-domx-plugins-interact/movable',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins-base",
+    "./interact"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+    var Movable = plugins.Plugin.inherit({
+        klassName: "Movable",
+
+        pluginName : "lark.movable",
+
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+
+
+            function updateWithTouchData(e) {
+                var keys, i;
+
+                if (e.changedTouches) {
+                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
+                    for (i = 0; i < keys.length; i++) {
+                        e[keys[i]] = e.changedTouches[0][keys[i]];
+                    }
+                }
+            }
+
+            function updateWithMoveData(e) {
+                e.movable = self;
+                e.moveEl = elm;
+                e.handleEl = handleEl;
+            }
+
+            options = this.options;
+            var self = this,
+                handleEl = options.handle || elm,
+                auto = options.auto === false ? false : true,
+                constraints = options.constraints,
+                overlayDiv,
+                doc = options.document || document,
+                downButton,
+                start,
+                stop,
+                drag,
+                startX,
+                startY,
+                originalPos,
+                size,
+                startingCallback = options.starting,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped,
+
+                start = function(e) {
+                    var docSize = geom.getDocumentSize(doc),
+                        cursor;
+
+                    updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (startingCallback) {
+                        var ret = startingCallback(e)
+                        if ( ret === false) {
+                            return;
+                        } else if (langx.isPlainObject(ret)) {
+                            if (ret.constraints) {
+                                constraints = ret.constraints;
+                            }
+                            if (ret.started) {
+                                startedCallback = ret.started;
+                            }
+                            if (ret.moving) {
+                                movingCallback = ret.moving;
+                            }                            
+                            if (ret.stopped) {
+                                stoppedCallback = ret.stopped;
+                            }     
+                        }
+                    }
+
+                    e.preventDefault();
+
+                    downButton = e.button;
+                    //handleEl = getHandleEl();
+                    startX = e.screenX;
+                    startY = e.screenY;
+
+                    originalPos = geom.relativePosition(elm);
+                    size = geom.size(elm);
+
+                    // Grab cursor from handle so we can place it on overlay
+                    cursor = styler.css(handleEl, "cursor");
+
+                    overlayDiv = noder.createElement("div");
+                    styler.css(overlayDiv, {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: docSize.width,
+                        height: docSize.height,
+                        zIndex: 0x7FFFFFFF,
+                        opacity: 0.0001,
+                        cursor: cursor
+                    });
+                    noder.append(doc.body, overlayDiv);
+
+                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+
+                move = function(e) {
+                    updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (e.button !== 0) {
+                        return stop(e);
+                    }
+
+                    e.deltaX = e.screenX - startX;
+                    e.deltaY = e.screenY - startY;
+
+                    if (auto) {
+                        var l = originalPos.left + e.deltaX,
+                            t = originalPos.top + e.deltaY;
+                        if (constraints) {
+
+                            if (l < constraints.minX) {
+                                l = constraints.minX;
+                            }
+
+                            if (l > constraints.maxX) {
+                                l = constraints.maxX;
+                            }
+
+                            if (t < constraints.minY) {
+                                t = constraints.minY;
+                            }
+
+                            if (t > constraints.maxY) {
+                                t = constraints.maxY;
+                            }
+                        }
+                    }
+
+                    geom.relativePosition(elm, {
+                        left: l,
+                        top: t
+                    })
+
+                    e.preventDefault();
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+
+                stop = function(e) {
+                    updateWithTouchData(e);
+
+                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+
+                    noder.remove(overlayDiv);
+
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }
+                };
+
+            eventer.on(handleEl, "mousedown touchstart", start);
+
+            this._handleEl = handleEl;
+
+        },
+
+        remove : function() {
+            eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Movable,"movable");
+
+    return interact.Movable = Movable;
+});
+
+define('skylark-domx-plugins-pictures/pictures',[
+    "skylark-langx/skylark"
+],function (skylark) {
+    'use strict';
+
+    return skylark.attach("domx.plugins.pictures");
+
+});
+define('skylark-domx-plugins-pictures/viewer',[
+    "skylark-langx",
+    "skylark-domx/eventer",
+    "skylark-domx/geom",
+    "skylark-domx/query",
+    "skylark-domx-images/preload",
+    "skylark-domx-plugins-base",
+    "skylark-domx-plugins-interact/movable",
+    "./pictures"
+], function (langx,eventer,geom,$,preload,plugins,Movable,pictures) {
+    'use strict';
+
+    var PictureViewer = plugins.Plugin.inherit({
+        klassName : "PictureViewer",
+
+        pluginName : "lark.domx.pictureviewer",
+
+        options : {
+            ratioThreshold: 0.1,
+            minRatio: 0.05,
+            maxRatio: 16,
+            movable : true,
+
+            classes : {
+                grab : null,
+                loader : null
+            }
+        },
+
+        _construct : function(elm,options) {
+            plugins.Plugin.prototype._construct.call(this,elm,options);
+
+            this.$stage = this.$();
+            this.$image = this.$stage.find("img");
+            
+
+            this.$stage.off("wheel").on("wheel", e => {
+                this._handleWheel(e);
+            });
+
+            if (this.options.movable) {
+                this._movable = new Movable(this.$image[0],{
+                    starting : (e) => {
+                        const imageWidth = this.$image.width();
+                        const imageHeight = this.$image.height();
+                        const stageWidth = this.$stage.width();
+                        const stageHeight = this.$stage.height();
+                        let minX,minY,maxX,maxY;
+
+                        if (stageWidth>=imageWidth && stageHeight>=imageHeight) {
+                            return false;
+                        }
+
+                        if (stageWidth>=imageWidth) {
+                            minX=maxX=(stageWidth-imageWidth) / 2;
+                        } else {
+                            minX = stageWidth - imageWidth;
+                            maxX = 0;
+                        }
+
+                        if (stageHeight>=imageHeight) {
+                            minY=maxY=(stageHeight-imageHeight) / 2;
+                        } else {
+                            minY = stageHeight - imageHeight;
+                            maxY = 0;
+                        }
+
+                        return {
+                            constraints : {
+                                minX,
+                                maxX,
+                                minY,
+                                maxY
+                            }
+                        };
+                    },
+                    started : function(e) {
+                        eventer.stop(e);
+                    }
+                });
+            }
+
+        }, 
+
+        getImageScaleToStage : function(stageWidth, stageHeight) {
+            let scale = 1;
+            if (!this.isRotated) {
+                scale = Math.min(stageWidth / this.img.width, stageHeight / this.img.height, 1);
+            } else {
+                scale = Math.min(stageWidth / this.img.height, stageHeight / this.img.width, 1);
+            }
+            return scale;
+        },
+
+        setGrabCursor : function (imageData, stageData, isRotated) {
+            const imageWidth = !isRotated ? imageData.w : imageData.h;
+            const imageHeight = !isRotated ? imageData.h : imageData.w;
+            if (imageHeight > stageData.h || imageWidth > stageData.w) {
+                this.$stage.addClass('is-grab');
+            }
+            if (imageHeight <= stageData.h && imageWidth <= stageData.w) {
+                this.$stage.removeClass('is-grab');
+            }
+        },
+
+        setImageSize: function(img) {
+            const stageData = {
+                w: this.$stage.width(),
+                h: this.$stage.height()
+            };
+            const scale = this.getImageScaleToStage(stageData.w, stageData.h);
+            this.$image.css({
+                width: Math.ceil(img.width * scale) + 'px',
+                height: Math.ceil(img.height * scale) + 'px',
+                left: (stageData.w - Math.ceil(img.width * scale)) / 2 + 'px',
+                top: (stageData.h - Math.ceil(img.height * scale)) / 2 + 'px'
+            });
+            langx.mixin(this.imageData, {
+                initWidth: img.width * scale,
+                initHeight: img.height * scale,
+                initLeft: (stageData.w - img.width * scale) / 2,
+                initTop: (stageData.h - img.height * scale) / 2,
+                width: img.width * scale,
+                height: img.height * scale,
+                left: (stageData.w - img.width * scale) / 2,
+                top: (stageData.h - img.height * scale) / 2
+            });
+            this.setGrabCursor({
+                w: this.$image.width(),
+                h: this.$image.height()
+            }, {
+                w: this.$stage.width(),
+                h: this.$stage.height()
+            }, this.isRotated);
+            if (!this.imageLoaded) {
+                this.$stage.find(".${ this.options.classes.loader }").remove();
+                this.$stage.removeClass('stage-ready');
+                this.$image.removeClass('image-ready');
+                if (this.options.initAnimation && !this.options.progressiveLoading) {
+                    this.$image.fadeIn();
+                }
+                this.imageLoaded = true;
+            }
+        },
+
+        loadImage : function(imgSrc, fn, err) {
+            this.$image.removeAttr('style').attr('src', '');
+            this.isRotated = false;
+            this.rotateAngle = 0;
+            this.imageLoaded = false;
+            this.$stage.append(`<div class="${ this.options.classes.loader }"></div>`);
+            this.$stage.addClass('stage-ready');
+            this.$image.addClass('image-ready');
+            if (this.options.initAnimation && !this.options.progressiveLoading) {
+                this.$image.hide();
+            }
+            this.$image.attr('src', imgSrc);
+            preload(imgSrc).then((data) => {
+                var img = data.imgs[0];
+                this.img = img;
+                this.imageData = {
+                    originalWidth: img.width,
+                    originalHeight: img.height
+                };
+                ///if (this.isMaximized || this.isOpened && this.options.fixedModalPos) {
+                ///    this.setImageSize(img);
+                ///} else {
+                ///    this.setModalSize(img);
+                ///}
+                if (fn) {
+                    fn(img);
+                }
+            }, () => {
+                this.$photoviewer.find(".${ this.options.classes.loader }").remove();
+                if (err) {
+                    err.call();
+                }
+            });
+
+        },
+
+        _handleWheel : function(e) {
+            e.preventDefault();
+            let delta = 1;
+            if (e.deltaY) {
+                delta = e.deltaY > 0 ? 1 : -1;
+            } else if (e.wheelDelta) {
+                delta = -e.wheelDelta / 120;
+            } else if (e.detail) {
+                delta = e.detail > 0 ? 1 : -1;
+            }
+            const ratio = -delta * this.options.ratioThreshold;
+            const pointer = {
+                x: e.clientX - this.$stage.offset().left + geom.scrollLeft(document.body),
+                y: e.clientY - this.$stage.offset().top + geom.scrollTop(document.body)
+            };
+            this.zoom(ratio, pointer, e);
+        },
+
+        zoom : function(ratio, origin, e) {
+            ratio = ratio < 0 ? 1 / (1 - ratio) : 1 + ratio;
+            ratio = this.$image.width() / this.imageData.originalWidth * ratio;
+            if (ratio > this.options.maxRatio || ratio < this.options.minRatio) {
+                return;
+            }
+            this.zoomTo(ratio, origin, e);
+        },
+
+        zoomTo : function(ratio, origin, e) {
+            const $image = this.$image;
+            const $stage = this.$stage;
+            const imgData = {
+                w: this.imageData.width,
+                h: this.imageData.height,
+                x: this.imageData.left,
+                y: this.imageData.top
+            };
+            const stageData = {
+                w: $stage.width(),
+                h: $stage.height(),
+                x: $stage.offset().left,
+                y: $stage.offset().top
+            };
+            const newWidth = this.imageData.originalWidth * ratio;
+            const newHeight = this.imageData.originalHeight * ratio;
+            let newLeft = origin.x - (origin.x - imgData.x) / imgData.w * newWidth;
+            let newTop = origin.y - (origin.y - imgData.y) / imgData.h * newHeight;
+            const δ = !this.isRotated ? 0 : (newWidth - newHeight) / 2;
+            const imgNewWidth = !this.isRotated ? newWidth : newHeight;
+            const imgNewHeight = !this.isRotated ? newHeight : newWidth;
+            const offsetX = stageData.w - newWidth;
+            const offsetY = stageData.h - newHeight;
+            if (imgNewHeight <= stageData.h) {
+                newTop = (stageData.h - newHeight) / 2;
+            } else {
+                newTop = newTop > δ ? δ : newTop > offsetY - δ ? newTop : offsetY - δ;
+            }
+            if (imgNewWidth <= stageData.w) {
+                newLeft = (stageData.w - newWidth) / 2;
+            } else {
+                newLeft = newLeft > -δ ? -δ : newLeft > offsetX + δ ? newLeft : offsetX + δ;
+            }
+            if (Math.abs(this.imageData.initWidth - newWidth) < this.imageData.initWidth * 0.05) {
+                this.setImageSize(this.img);
+            } else {
+                $image.css({
+                    width: Math.round(newWidth) + 'px',
+                    height: Math.round(newHeight) + 'px',
+                    left: Math.round(newLeft) + 'px',
+                    top: Math.round(newTop) + 'px'
+                });
+                this.setGrabCursor({
+                    w: Math.round(imgNewWidth),
+                    h: Math.round(imgNewHeight)
+                }, {
+                    w: stageData.w,
+                    h: stageData.h
+                });
+            }
+            $.extend(this.imageData, {
+                width: newWidth,
+                height: newHeight,
+                left: newLeft,
+                top: newTop
+            });
+        },
+
+        rotate : function(angle) {
+            this.rotateAngle = this.rotateAngle + angle;
+            if (this.rotateAngle / 90 % 2 === 0) {
+                this.isRotated = false;
+            } else {
+                this.isRotated = true;
+            }
+            this.rotateTo(this.rotateAngle);
+        },
+        rotateTo: function(angle) {
+            this.$image.css({ transform: 'rotate(' + angle + 'deg)' });
+            this.setImageSize({
+                width: this.imageData.originalWidth,
+                height: this.imageData.originalHeight
+            });
+            this.$stage.removeClass('is-grab');
+        },
+        resize: function() {
+            const imageWidth = this.$image.width();
+            const imageHeight = this.$image.height();
+            const stageWidth = this.$stage.width();
+            const stageHeight = this.$stage.height();
+            const left = (stageWidth - imageWidth) /2;
+            const top = (stageHeight- imageHeight) /2;
+            this.$image.css({
+                left,
+                top
+            });
+        },
+
+        shortcut: function(keyCode,ctrlKey,altKey) {
+            var handled = false;
+            switch (keyCode) {
+                // +
+                case 187:
+                    this.zoom(this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // -
+                case 189:
+                    this.zoom(-this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // + Firefox
+                case 61:
+                    this.zoom(this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // - Firefox
+                case 173:
+                    this.zoom(-this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // Ctrl + Alt + 0
+                case 48:
+                    if (ctrlKey && altKey) {
+                        this.zoomTo(1, {
+                            x: this.$stage.width() / 2,
+                            y: this.$stage.height() / 2
+                        }, e);
+                    }
+                    handled = true;
+                    break;
+                // Ctrl + ,
+                case 188:
+                    if (ctrlKey) {
+                        this.rotate(-90);
+                    }
+                    break;
+                // Ctrl + .
+                case 190:
+                    if (ctrlKey) {
+                        this.rotate(90);
+                    }
+                    handled = true;
+                    break;
+                default:
+            }
+
+            return handled;
+        }
+    });
+
+    return pictures.PictureViewer = PictureViewer;
+});
+define('skylark-domx-forms/forms',[
+	"skylark-langx/skylark"
+],function(skylark){
+	return skylark.attach("domx.forms",{});
+});
+define('skylark-domx-forms/deserialize',[
+  "skylark-langx/langx",
+  "skylark-domx-query",
+  "./forms"
+],function(langx,$,forms){
+  /**
+   * Updates a key/valueArray with the given property and value. Values will always be stored as arrays.
+   *
+   * @param prop The property to add the value to.
+   * @param value The value to add.
+   * @param obj The object to update.
+   * @returns {object} Updated object.
+   */
+  function updateKeyValueArray( prop, value, obj ) {
+    var current = obj[ prop ];
+
+    if ( current === undefined ) {
+      obj[ prop ] = [ value ];
+    } else {
+      current.push( value );
+    }
+
+    return obj;
+  }
+
+  /**
+   * Get all of the fields contained within the given elements by name.
+   *
+   * @param formElm The form element.
+   * @param filter Custom filter to apply to the list of fields.
+   * @returns {object} All of the fields contained within the given elements, keyed by name.
+   */
+  function getFieldsByName(formElm, filter ) {
+    var elementsByName = {};
+
+    // Extract fields from elements
+    var fields = $(formElm)
+      .map(function convertFormToElements() {
+        return this.elements ? langx.makeArray( this.elements ) : this;
+      })
+      .filter( filter || ":input:not(:disabled)" )
+      .get();
+
+    langx.each( fields, function( index, field ) {
+      updateKeyValueArray( field.name, field, elementsByName );
+    });
+
+    return elementsByName;
+  }
+
+  /**
+   * Figure out the type of an element. Input type will be used first, falling back to nodeName.
+   *
+   * @param element DOM element to check type of.
+   * @returns {string} The element's type.
+   */
+  function getElementType( element ) {
+    return ( element.type || element.nodeName ).toLowerCase();
+  }
+
+  /**
+   * Normalize the provided data into a key/valueArray store.
+   *
+   * @param data The data provided by the user to the plugin.
+   * @returns {object} The data normalized into a key/valueArray store.
+   */
+  function normalizeData( data ) {
+    var normalized = {};
+    var rPlus = /\+/g;
+
+    // Convert data from .serializeObject() notation
+    if ( langx.isPlainObject( data ) ) {
+      langx.extend( normalized, data );
+
+      // Convert non-array values into an array
+      langx.each( normalized, function( name, value ) {
+        if ( !langx.isArray( value ) ) {
+          normalized[ name ] = [ value ];
+        }
+      });
+
+    // Convert data from .serializeArray() notation
+    } else if ( langx.isArray( data ) ) {
+      langx.each( data, function( index, field ) {
+        updateKeyValueArray( field.name, field.value, normalized );
+      });
+
+    // Convert data from .serialize() notation
+    } else if ( typeof data === "string" ) {
+      langx.each( data.split( "&" ), function( index, field ) {
+        var current = field.split( "=" );
+        var name = decodeURIComponent( current[ 0 ].replace( rPlus, "%20" ) );
+        var value = decodeURIComponent( current[ 1 ].replace( rPlus, "%20" ) );
+        updateKeyValueArray( name, value, normalized );
+      });
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Map of property name -> element types.
+   *
+   * @type {object}
+   */
+  var updateTypes = {
+    checked: [
+      "radio",
+      "checkbox"
+    ],
+    selected: [
+      "option",
+      "select-one",
+      "select-multiple"
+    ],
+    value: [
+      "button",
+      "color",
+      "date",
+      "datetime",
+      "datetime-local",
+      "email",
+      "hidden",
+      "month",
+      "number",
+      "password",
+      "range",
+      "reset",
+      "search",
+      "submit",
+      "tel",
+      "text",
+      "textarea",
+      "time",
+      "url",
+      "week"
+    ]
+  };
+
+  /**
+   * Get the property to update on an element being updated.
+   *
+   * @param element The DOM element to get the property for.
+   * @returns The name of the property to update if element is supported, otherwise `undefined`.
+   */
+  function getPropertyToUpdate( element ) {
+    var type = getElementType( element );
+    var elementProperty = undefined;
+
+    langx.each( updateTypes, function( property, types ) {
+      if ( langx.inArray( type, types ) > -1 ) {
+        elementProperty = property;
+        return false;
+      }
+    });
+
+    return elementProperty;
+  }
+
+  /**
+   * Update the element based on the provided data.
+   *
+   * @param element The DOM element to update.
+   * @param elementIndex The index of this element in the list of elements with the same name.
+   * @param value The serialized element value.
+   * @param valueIndex The index of the value in the list of values for elements with the same name.
+   * @param callback A function to call if the value of an element was updated.
+   */
+  function update( element, elementIndex, value, valueIndex, callback ) {
+    var property = getPropertyToUpdate( element );
+
+    // Handle value inputs
+    // If there are multiple value inputs with the same name, they will be populated by matching indexes.
+    if ( property == "value" && elementIndex == valueIndex ) {
+      element.value = value;
+      callback.call( element, value );
+
+    // Handle select menus, checkboxes and radio buttons
+    } else if ( property == "checked" || property == "selected" ) {
+      var fields = [];
+
+      // Extract option fields from select menus
+      if ( element.options ) {
+        langx.each( element.options, function( index, option ) {
+          fields.push( option );
+        });
+
+      } else {
+        fields.push( element );
+      }
+
+      // #37: Remove selection from multiple select menus before deserialization
+      if ( element.multiple && valueIndex == 0 ) {
+        element.selectedIndex = -1;
+      }
+
+      langx.each( fields, function( index, field ) {
+        if ( field.value == value ) {
+          field[ property ] = true;
+          callback.call( field, value );
+        }
+      });
+    }
+  }
+
+  /**
+   * Default plugin options.
+   *
+   * @type {object}
+   */
+  var defaultOptions = {
+    change: langx.noop,
+    complete: langx.noop
+  };
+
+  /**
+   * The $.deserialize function.
+   *
+   * @param data The data to deserialize.
+   * @param options Additional options.
+   * @returns {jQuery} The jQuery object that was provided to the plugin.
+   */
+  function deserialize(formElm,data, options ) {
+
+    // Backwards compatible with old arguments: data, callback
+    if ( langx.isFunction( options ) ) {
+      options = { complete: options };
+    }
+
+    options = langx.extend( defaultOptions, options || {} );
+    data = normalizeData( data );
+
+    var elementsByName = getFieldsByName( formElm, options.filter );
+
+    langx.each( data, function( name, values ) {
+      langx.each( elementsByName[ name ], function( elementIndex, element ) {
+        langx.each( values, function( valueIndex, value ) {
+          update( element, elementIndex, value, valueIndex, options.change );
+        });
+      });
+    });
+
+    options.complete.call( formElm );
+
+    return this;
+  };
+
+  return forms.deserialize = deserialize;
+});
+define('skylark-domx-forms/serializeArray',[
+  "skylark-langx/langx",
+  "skylark-domx-data",
+  "./forms"
+],function(langx,datax,forms){
+    function serializeArray(formElm) {
+        var name, type, result = [],
+            add = function(value) {
+                if (value.forEach) return value.forEach(add)
+                result.push({ name: name, value: value })
+            }
+        langx.each(formElm.elements, function(_, field) {
+            type = field.type, name = field.name
+            if (name && field.nodeName.toLowerCase() != 'fieldset' &&
+                !field.disabled && type != 'submit' && type != 'reset' && type != 'button' && type != 'file' &&
+                ((type != 'radio' && type != 'checkbox') || field.checked))
+                add(datax.val(field))
+        })
+        return result
+    };
+
+    return forms.serializeArray = serializeArray;
+});
+
+define('skylark-domx-forms/serializeObject',[
+  "skylark-langx/langx",
+  "./forms",
+  "./serializeArray"
+],function(langx,forms,serializeArray){
+
+  function serializeObject(formElm){
+    var obj = {};
+    
+    langx.each(serializeArray(formElm), function(i,o){
+      var n = o.name,
+        v = o.value;
+        
+        obj[n] = obj[n] === undefined ? v
+          : langx.isArray( obj[n] ) ? obj[n].concat( v )
+          : [ obj[n], v ];
+    });
+    
+    return obj;
+  }
+
+  return forms.serializeObject = serializeObject;
+});  
+define('skylark-domx-forms/serialize',[
+  "skylark-langx/langx",
+  "./forms",
+  "./serializeArray"
+],function(langx,forms,serializeArray){
+    function serialize(formElm) {
+        var result = []
+        serializeArray(formElm).forEach(function(elm) {
+            result.push(encodeURIComponent(elm.name) + '=' + encodeURIComponent(elm.value))
+        })
+        return result.join('&')
+    }
+
+    return forms.serialize = serialize;
+});
+define('skylark-domx-forms/main',[
+	"./forms",
+    "skylark-domx-velm",
+    "skylark-domx-query",
+    "./deserialize",
+    "./serializeArray",
+    "./serializeObject",
+    "./serialize"
+],function(forms,velm,$){
+
+    // from ./data
+    velm.delegate([
+        "deserialize",
+        "serializeArray",
+        "serializeObject",
+        "serialize"
+    ], forms);
+
+    $.fn.deserialize = $.wraps.wrapper_value(forms.deserialize, forms, forms.deserialize);
+    $.fn.serializeArray = $.wraps.wrapper_value(forms.serializeArray, forms, forms.serializeArray);
+    $.fn.serializeObject = $.wraps.wrapper_value(forms.serializeObject, forms, forms.serializeObject);
+    $.fn.serialize = $.wraps.wrapper_value(forms.serialize, forms, forms.serialize);
+
+
+	return forms;
+});
+define('skylark-domx-forms', ['skylark-domx-forms/main'], function (main) { return main; });
 
 define('skylark-domx-scripter/scripter',[
     "skylark-langx/skylark",
@@ -20256,382 +21404,6 @@ define('skylark-jquery/queue',[
 
 });
 
-define('skylark-domx-plugins-base/plugins',[
-    "skylark-langx-ns",
-    "skylark-langx-types",
-    "skylark-langx-objects",
-    "skylark-langx-funcs",
-    "skylark-langx-events/Emitter",
-    "skylark-domx-noder",
-    "skylark-domx-data",
-    "skylark-domx-eventer",
-    "skylark-domx-finder",
-    "skylark-domx-geom",
-    "skylark-domx-styler",
-    "skylark-domx-fx",
-    "skylark-domx-query",
-    "skylark-domx-velm"
-], function(
-    skylark,
-    types,
-    objects,
-    funcs,
-    Emitter, 
-    noder, 
-    datax, 
-    eventer, 
-    finder, 
-    geom, 
-    styler, 
-    fx, 
-    $, 
-    elmx
-) {
-    "use strict";
-
-    var slice = Array.prototype.slice,
-        concat = Array.prototype.concat,
-        pluginKlasses = {},
-        shortcuts = {};
-
-    /*
-     * Create or get or destory a plugin instance assocated with the element.
-     */
-    function instantiate(elm,pluginName,options) {
-        var pair = pluginName.split(":"),
-            instanceDataName = pair[1];
-        pluginName = pair[0];
-
-        if (!instanceDataName) {
-            instanceDataName = pluginName;
-        }
-
-        var pluginInstance = datax.data( elm, instanceDataName );
-
-        if (options === "instance") {
-            return pluginInstance;
-        } else if (options === "destroy") {
-            if (!pluginInstance) {
-                throw new Error ("The plugin instance is not existed");
-            }
-            pluginInstance.destroy();
-            //datax.removeData( elm, pluginName);
-            pluginInstance = undefined;
-        } else {
-            if (!pluginInstance) {
-                if (options !== undefined && typeof options !== "object") {
-                    throw new Error ("The options must be a plain object");
-                }
-                var pluginKlass = pluginKlasses[pluginName]; 
-                pluginInstance = new pluginKlass(elm,options);
-                datax.data( elm, instanceDataName,pluginInstance );
-            } else if (options) {
-                pluginInstance.reset(options);
-            }
-        }
-
-        return pluginInstance;
-    }
-
-
-    function shortcutter(pluginName,extfn) {
-       /*
-        * Create or get or destory a plugin instance assocated with the element,
-        * and also you can execute the plugin method directory;
-        */
-        return function (elm,options) {
-            var  plugin = instantiate(elm, pluginName,"instance");
-            if ( options === "instance" ) {
-              return plugin || null;
-            }
-
-            if (!plugin) {
-                plugin = instantiate(elm, pluginName,typeof options == 'object' && options || {});
-                if (typeof options != "string") {
-                  return this;
-                }
-            } 
-            if (options) {
-                var args = slice.call(arguments,1); //2
-                if (extfn) {
-                    return extfn.apply(plugin,args);
-                } else {
-                    if (typeof options == 'string') {
-                        var methodName = options;
-
-                        if ( !plugin ) {
-                            throw new Error( "cannot call methods on " + pluginName +
-                                " prior to initialization; " +
-                                "attempted to call method '" + methodName + "'" );
-                        }
-
-                        if ( !types.isFunction( plugin[ methodName ] ) || methodName.charAt( 0 ) === "_" ) {
-                            throw new Error( "no such method '" + methodName + "' for " + pluginName +
-                                " plugin instance" );
-                        }
-
-                        args = slice.call(args,1); //remove method name
-
-                        var ret = plugin[methodName].apply(plugin,args);
-                        if (ret == plugin) {
-                          ret = undefined;
-                        }
-
-                        return ret;
-                    }                
-                }                
-            }
-
-        }
-
-    }
-
-    /*
-     * Register a plugin type
-     */
-    function register( pluginKlass,shortcutName,instanceDataName,extfn) {
-        var pluginName = pluginKlass.prototype.pluginName;
-        
-        pluginKlasses[pluginName] = pluginKlass;
-
-        if (shortcutName) {
-            if (instanceDataName && types.isFunction(instanceDataName)) {
-                extfn = instanceDataName;
-                instanceDataName = null;
-            } 
-            if (instanceDataName) {
-                pluginName = pluginName + ":" + instanceDataName;
-            }
-
-            var shortcut = shortcuts[shortcutName] = shortcutter(pluginName,extfn);
-                
-            $.fn[shortcutName] = function(options) {
-                var returnValue = this;
-
-                if ( !this.length && options === "instance" ) {
-                  returnValue = undefined;
-                } else {
-                  var args = slice.call(arguments);
-                  this.each(function () {
-                    var args2 = slice.call(args);
-                    args2.unshift(this);
-                    var  ret  = shortcut.apply(undefined,args2);
-                    if (ret !== undefined) {
-                        returnValue = ret;
-                    }
-                  });
-                }
-
-                return returnValue;
-            };
-
-            elmx.partial(shortcutName,function(options) {
-                var  ret  = shortcut(this._elm,options);
-                if (ret === undefined) {
-                    ret = this;
-                }
-                return ret;
-            });
-
-        }
-    }
-
-    function parentClass(ctor){
-        if (ctor.hasOwnProperty("superclass")) {
-            return ctor.superclass;
-        }
-
-        return Object.getPrototypeOf(ctor);
-    }
-
- 
-    var Plugin =   Emitter.inherit({
-        klassName: "Plugin",
-
-        _construct : function(elm,options) {
-           this._elm = elm;
-           this._initOptions(options);
-        },
-
-        _initOptions : function(options) {
-          var ctor = this.constructor,
-              cache = ctor.cache = (ctor.hasOwnProperty("cache") ? ctor.cache : {}),
-              defaults = cache.defaults;
-          if (!defaults) {
-            var  ctors = [];
-            do {
-              ctors.unshift(ctor);
-              if (ctor === Plugin) {
-                break;
-              }
-              ctor = parentClass(ctor);
-            } while (ctor);
-
-            defaults = cache.defaults = {};
-            for (var i=0;i<ctors.length;i++) {
-              ctor = ctors[i];
-              if (ctor.prototype.hasOwnProperty("options")) {
-                objects.mixin(defaults,ctor.prototype.options,true);
-              }
-              if (ctor.hasOwnProperty("options")) {
-                objects.mixin(defaults,ctor.options,true);
-              }
-            }
-          }
-          Object.defineProperty(this,"options",{
-            value :objects.mixin({},defaults,options,true)
-          });
-
-          //return this.options = langx.mixin({},defaults,options);
-          return this.options;
-        },
-
-
-        destroy: function() {
-
-            this._destroy();
-
-            // remove all event lisener
-            this.unlistenTo();
-            // remove data 
-            datax.removeData(this._elm,this.pluginName );
-        },
-
-        _destroy: funcs.noop,
-
-        _delay: function( handler, delay ) {
-            function handlerProxy() {
-                return ( typeof handler === "string" ? instance[ handler ] : handler )
-                    .apply( instance, arguments );
-            }
-            var instance = this;
-            return setTimeout( handlerProxy, delay || 0 );
-        },
-
-        elmx : function(elm) {
-            elm = elm || this._elm;
-            return elmx(elm);
-
-        },
-
-        $ : function(elm) {
-            elm = elm || this._elm;
-            return $(elm);
-        },
-
-        option: function( key, value ) {
-            var options = key;
-            var parts;
-            var curOption;
-            var i;
-
-            if ( arguments.length === 0 ) {
-
-                // Don't return a reference to the internal hash
-                return objects.mixin( {}, this.options );
-            }
-
-            if ( typeof key === "string" ) {
-
-                // Handle nested keys, e.g., "foo.bar" => { foo: { bar: ___ } }
-                options = {};
-                parts = key.split( "." );
-                key = parts.shift();
-                if ( parts.length ) {
-                    curOption = options[ key ] = objects.mixin( {}, this.options[ key ] );
-                    for ( i = 0; i < parts.length - 1; i++ ) {
-                        curOption[ parts[ i ] ] = curOption[ parts[ i ] ] || {};
-                        curOption = curOption[ parts[ i ] ];
-                    }
-                    key = parts.pop();
-                    if ( arguments.length === 1 ) {
-                        return curOption[ key ] === undefined ? null : curOption[ key ];
-                    }
-                    curOption[ key ] = value;
-                } else {
-                    if ( arguments.length === 1 ) {
-                        return this.options[ key ] === undefined ? null : this.options[ key ];
-                    }
-                    options[ key ] = value;
-                }
-            }
-
-            this._setOptions( options );
-
-            return this;
-        },
-
-        _setOptions: function( options ) {
-            var key;
-
-            for ( key in options ) {
-                this._setOption( key, options[ key ] );
-            }
-
-            return this;
-        },
-
-        _setOption: function( key, value ) {
-
-            this.options[ key ] = value;
-
-            return this;
-        },
-
-        getUID : function (prefix) {
-            prefix = prefix || "plugin";
-            do prefix += ~~(Math.random() * 1000000)
-            while (document.getElementById(prefix))
-            return prefix;
-        },
-
-        elm : function() {
-            return this._elm;
-        }
-
-    });
-
-    Plugin.instantiate = function(elm,options) {
-        return instantiate(elm,this.prototype.pluginName,options);
-    };
-    
-    $.fn.plugin = function(name,options) {
-        var args = slice.call( arguments, 1 ),
-            self = this,
-            returnValue ;
-
-        this.each(function(){
-            returnValue = instantiate.apply(self,[this,name].concat(args));
-        });
-        return returnValue;
-    };
-
-    elmx.partial("plugin",function(name,options) {
-        var args = slice.call( arguments, 1 );
-        return instantiate.apply(this,[this._elm,name].concat(args));
-    }); 
-
-
-    function plugins() {
-        return plugins;
-    }
-     
-    objects.mixin(plugins, {
-        instantiate,
-        Plugin,
-        register,
-        shortcuts
-    });
-
-    return  skylark.attach("domx.plugins",plugins);
-});
-define('skylark-domx-plugins-base/main',[
-	"./plugins"
-],function(plugins){
-	return plugins;
-});
-define('skylark-domx-plugins-base', ['skylark-domx-plugins-base/main'], function (main) { return main; });
-
 define('skylark-jquery/JqueryPlugin',[
 	"skylark-langx-types",
 	"skylark-langx-objects",
@@ -21485,130 +22257,6 @@ define('skylark-photoviewer/defaults',[
         customButtons: {}
     };
 });
-define('skylark-langx/main',[
-    "./langx"
-], function(langx) {
-    return langx;
-});
-
-define('skylark-langx', ['skylark-langx/main'], function (main) { return main; });
-
-define('skylark-domx-images/images',[
-    "skylark-langx/skylark"
-], function(skylark) {
-
-  function images() {
-    return images;
-  }
-
-  return skylark.attach("domx.images" , images);
-});
-
-define('skylark-domx-images/isCompleted',[
-	"./images"
-],function(images){
-  function isCompleted(img) {
-     return img.complete && img.naturalWidth !== undefined;
-  }
-
-  return images.isCompleted = isCompleted;
-});
-define('skylark-domx-images/isLoaded',[
-	"./images"
-],function(images){
-
-  function isLoaded(img) {
-    return img.complete && img.naturalWidth !== 0;
-  }
-  return images.isLoaded = isLoaded;
-});
-define('skylark-domx-images/watch',[
-    "skylark-langx/langx",
-    "skylark-domx-eventer",
-    "./images",
-    "./isCompleted",
-    "./isLoaded"
-], function(langx,eventer,images,isCompleted,isLoaded) {
-
-  function watch(imgs) {
-    if (!langx.isArray(imgs)) {
-      imgs = [imgs];
-    }
-    var totalCount = imgs.length,
-        progressedCount = 0,
-        successedCount = 0,
-        faileredCount = 0,
-        d = new langx.Deferred();
-
-
-    function complete() {
-
-      d.resolve({
-        "total" : totalCount,
-        "successed" : successedCount,
-        "failered" : faileredCount,
-        "imgs" : imgs 
-      });
-    }
-
-    function progress(img,isLoaded) {
-
-      progressedCount++;
-      if (isLoaded) {
-        successedCount ++ ; 
-      } else {
-        faileredCount ++ ;
-      }
-
-      // progress event
-      d.progress({
-        "img" : img,
-        "isLoaded" : isLoaded,
-        "progressed" : progressedCount,
-        "total" : totalCount,
-        "imgs" : imgs 
-      });
-
-      // check if completed
-      if ( progressedCount == totalCount ) {
-        complete();
-      }
-    }
-
-    function check() {
-      if (!imgs.length ) {
-        complete();
-        return;
-      }
-
-      imgs.forEach(function(img) {
-        if (isCompleted(img)) {
-          progress(img,isLoaded(img));
-        } else {
-          eventer.on(img,{
-            "load" : function() {
-              progress(img,true);
-            },
-
-            "error" : function() {
-              progress(img,false);
-            }
-          });      
-        }
-      });
-    }
-
-    langx.defer(check);
-
-    d.promise.totalCount = totalCount;
-    return d.promise;
-  }
-
-
-
-  return images.watch = watch;
-});
-
 define('skylark-domx-images/loaded',[
 	"skylark-domx-finder",
 	"./images",
@@ -21658,28 +22306,6 @@ define('skylark-domx-images/loaded',[
   }
 
   return images.loaded = loaded;
-});
-define('skylark-domx-images/preload',[
-    "skylark-langx/langx",
-	"./images",
-	"./watch"
-],function(langx,images,watch){
-  function preload(urls,options) {
-      if (langx.isString(urls)) {
-        urls = [urls];
-      }
-      var images = [];
-
-      urls.forEach(function(url){
-        var img = new Image();
-        img.src = url;
-        images.push(img);
-      });
-
-      return watch(images);
-  }
-
-  return images.preload = preload;
 });
 define('skylark-domx-transforms/transforms',[
     "skylark-langx/skylark",
@@ -22137,219 +22763,6 @@ define('skylark-photoviewer/constants',[
         PUBLIC_VARS: PUBLIC_VARS
     };
 });
-define('skylark-domx-plugins-interact/polyfill',[],function(){
-
-});
-define('skylark-domx-plugins-interact/interact',[
-    "skylark-langx/skylark",
-    "./polyfill"
-], function(skylark) {
-
-	return skylark.attach("domx.plugins.interact",{});
-});
-
-
-define('skylark-domx-plugins-interact/movable',[
-    "skylark-langx/langx",
-    "skylark-domx-noder",
-    "skylark-domx-data",
-    "skylark-domx-geom",
-    "skylark-domx-eventer",
-    "skylark-domx-styler",
-    "skylark-domx-plugins-base",
-    "./interact"
-],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
-    var on = eventer.on,
-        off = eventer.off,
-        attr = datax.attr,
-        removeAttr = datax.removeAttr,
-        offset = geom.pagePosition,
-        addClass = styler.addClass,
-        height = geom.height,
-        some = Array.prototype.some,
-        map = Array.prototype.map;
-
-    var Movable = plugins.Plugin.inherit({
-        klassName: "Movable",
-
-        pluginName : "lark.movable",
-
-
-        _construct : function (elm, options) {
-            this.overrided(elm,options);
-
-
-
-            function updateWithTouchData(e) {
-                var keys, i;
-
-                if (e.changedTouches) {
-                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
-                    for (i = 0; i < keys.length; i++) {
-                        e[keys[i]] = e.changedTouches[0][keys[i]];
-                    }
-                }
-            }
-
-            function updateWithMoveData(e) {
-                e.movable = self;
-                e.moveEl = elm;
-                e.handleEl = handleEl;
-            }
-
-            options = this.options;
-            var self = this,
-                handleEl = options.handle || elm,
-                auto = options.auto === false ? false : true,
-                constraints = options.constraints,
-                overlayDiv,
-                doc = options.document || document,
-                downButton,
-                start,
-                stop,
-                drag,
-                startX,
-                startY,
-                originalPos,
-                size,
-                startingCallback = options.starting,
-                startedCallback = options.started,
-                movingCallback = options.moving,
-                stoppedCallback = options.stopped,
-
-                start = function(e) {
-                    var docSize = geom.getDocumentSize(doc),
-                        cursor;
-
-                    updateWithTouchData(e);
-                    updateWithMoveData(e);
-
-                    if (startingCallback) {
-                        var ret = startingCallback(e)
-                        if ( ret === false) {
-                            return;
-                        } else if (langx.isPlainObject(ret)) {
-                            if (ret.constraints) {
-                                constraints = ret.constraints;
-                            }
-                            if (ret.started) {
-                                startedCallback = ret.started;
-                            }
-                            if (ret.moving) {
-                                movingCallback = ret.moving;
-                            }                            
-                            if (ret.stopped) {
-                                stoppedCallback = ret.stopped;
-                            }     
-                        }
-                    }
-
-                    e.preventDefault();
-
-                    downButton = e.button;
-                    //handleEl = getHandleEl();
-                    startX = e.screenX;
-                    startY = e.screenY;
-
-                    originalPos = geom.relativePosition(elm);
-                    size = geom.size(elm);
-
-                    // Grab cursor from handle so we can place it on overlay
-                    cursor = styler.css(handleEl, "cursor");
-
-                    overlayDiv = noder.createElement("div");
-                    styler.css(overlayDiv, {
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: docSize.width,
-                        height: docSize.height,
-                        zIndex: 0x7FFFFFFF,
-                        opacity: 0.0001,
-                        cursor: cursor
-                    });
-                    noder.append(doc.body, overlayDiv);
-
-                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
-
-                    if (startedCallback) {
-                        startedCallback(e);
-                    }
-                },
-
-                move = function(e) {
-                    updateWithTouchData(e);
-                    updateWithMoveData(e);
-
-                    if (e.button !== 0) {
-                        return stop(e);
-                    }
-
-                    e.deltaX = e.screenX - startX;
-                    e.deltaY = e.screenY - startY;
-
-                    if (auto) {
-                        var l = originalPos.left + e.deltaX,
-                            t = originalPos.top + e.deltaY;
-                        if (constraints) {
-
-                            if (l < constraints.minX) {
-                                l = constraints.minX;
-                            }
-
-                            if (l > constraints.maxX) {
-                                l = constraints.maxX;
-                            }
-
-                            if (t < constraints.minY) {
-                                t = constraints.minY;
-                            }
-
-                            if (t > constraints.maxY) {
-                                t = constraints.maxY;
-                            }
-                        }
-                    }
-
-                    geom.relativePosition(elm, {
-                        left: l,
-                        top: t
-                    })
-
-                    e.preventDefault();
-                    if (movingCallback) {
-                        movingCallback(e);
-                    }
-                },
-
-                stop = function(e) {
-                    updateWithTouchData(e);
-
-                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
-
-                    noder.remove(overlayDiv);
-
-                    if (stoppedCallback) {
-                        stoppedCallback(e);
-                    }
-                };
-
-            eventer.on(handleEl, "mousedown touchstart", start);
-
-            this._handleEl = handleEl;
-
-        },
-
-        remove : function() {
-            eventer.off(this._handleEl);
-        }
-    });
-
-    plugins.register(Movable,"movable");
-
-    return interact.Movable = Movable;
-});
-
 define('skylark-domx-plugins-interact/resizable',[
     "skylark-langx/langx",
     "skylark-domx-noder",
@@ -22779,361 +23192,14 @@ define('skylark-photoviewer/window',[
 
     return Window;
 });
-define('skylark-photoviewer/picture_viewer',[
-    "skylark-domx-eventer",
-    "skylark-domx-plugins-base",
-    "skylark-domx-plugins-interact/movable",
-    'skylark-jquery',
-    './constants',
-    './utilities'
-
-], function (eventer,plugins,Movable,$,  Constants, Utilities) {
-    'use strict';
-
-    var Imager = plugins.Plugin.inherit({
-        klassName : "Imager",
-
-        pluginName : "lark.domx.imager",
-
-        options : {
-            ratioThreshold: 0.1,
-            minRatio: 0.05,
-            maxRatio: 16,
-            movable : true
-        },
-
-        _construct : function(elm,options) {
-            plugins.Plugin.prototype._construct.call(this,elm,options);
-
-            this.$stage = this.$();
-            this.$image = this.$stage.find("img");
-            
-
-            this.$stage.off(Constants.WHEEL_EVENT + Constants.EVENT_NS).on(Constants.WHEEL_EVENT + Constants.EVENT_NS, e => {
-                this._handleWheel(e);
-            });
-
-            if (this.options.movable) {
-                this._movable = new Movable(this.$image[0],{
-                    starting : (e) => {
-                        if (this.$stage.hasClass('is-grab')) {
-
-                        } else {
-                            return false;
-                        }
-                        const imageWidth = this.$image.width();
-                        const imageHeight = this.$image.height();
-                        const stageWidth = this.$stage.width();
-                        const stageHeight = this.$stage.height();
-                        let minX,minY,maxX,maxY;
-
-                        if (stageWidth>=imageWidth) {
-                            minX=maxX=(stageWidth-imageWidth) / 2;
-                        } else {
-                            minX = stageWidth - imageWidth;
-                            maxX = 0;
-                        }
-
-                        if (stageHeight>=imageHeight) {
-                            minY=maxY=(stageHeight-imageHeight) / 2;
-                        } else {
-                            minY = stageHeight - imageHeight;
-                            maxY = 0;
-                        }
-
-                        return {
-                            constraints : {
-                                minX,
-                                maxX,
-                                minY,
-                                maxY
-                            }
-                        };
-                    },
-                    started : function(e) {
-                        eventer.stop(e);
-                    }
-                });
-            }
-
-        }, 
-
-        getImageScaleToStage : function(stageWidth, stageHeight) {
-            let scale = 1;
-            if (!this.isRotated) {
-                scale = Math.min(stageWidth / this.img.width, stageHeight / this.img.height, 1);
-            } else {
-                scale = Math.min(stageWidth / this.img.height, stageHeight / this.img.width, 1);
-            }
-            return scale;
-        },
-
-        setImageSize: function(img) {
-            const stageData = {
-                w: this.$stage.width(),
-                h: this.$stage.height()
-            };
-            const scale = this.getImageScaleToStage(stageData.w, stageData.h);
-            this.$image.css({
-                width: Math.ceil(img.width * scale) + 'px',
-                height: Math.ceil(img.height * scale) + 'px',
-                left: (stageData.w - Math.ceil(img.width * scale)) / 2 + 'px',
-                top: (stageData.h - Math.ceil(img.height * scale)) / 2 + 'px'
-            });
-            $.extend(this.imageData, {
-                initWidth: img.width * scale,
-                initHeight: img.height * scale,
-                initLeft: (stageData.w - img.width * scale) / 2,
-                initTop: (stageData.h - img.height * scale) / 2,
-                width: img.width * scale,
-                height: img.height * scale,
-                left: (stageData.w - img.width * scale) / 2,
-                top: (stageData.h - img.height * scale) / 2
-            });
-            Utilities.setGrabCursor({
-                w: this.$image.width(),
-                h: this.$image.height()
-            }, {
-                w: this.$stage.width(),
-                h: this.$stage.height()
-            }, this.$stage, this.isRotated);
-            if (!this.imageLoaded) {
-                this.$stage.find(Constants.CLASS_NS + '-loader').remove();
-                this.$stage.removeClass('stage-ready');
-                this.$image.removeClass('image-ready');
-                if (this.options.initAnimation && !this.options.progressiveLoading) {
-                    this.$image.fadeIn();
-                }
-                this.imageLoaded = true;
-            }
-        },
-
-        loadImage : function(imgSrc, fn, err) {
-            this.$image.removeAttr('style').attr('src', '');
-            this.isRotated = false;
-            this.rotateAngle = 0;
-            this.imageLoaded = false;
-            this.$stage.append(`<div class="${ Constants.NS }-loader"></div>`);
-            this.$stage.addClass('stage-ready');
-            this.$image.addClass('image-ready');
-            if (this.options.initAnimation && !this.options.progressiveLoading) {
-                this.$image.hide();
-            }
-            this.$image.attr('src', imgSrc);
-            Utilities.preloadImage(imgSrc, img => {
-                this.img = img;
-                this.imageData = {
-                    originalWidth: img.width,
-                    originalHeight: img.height
-                };
-                ///if (this.isMaximized || this.isOpened && this.options.fixedModalPos) {
-                ///    this.setImageSize(img);
-                ///} else {
-                ///    this.setModalSize(img);
-                ///}
-                if (fn) {
-                    fn(img);
-                }
-            }, () => {
-                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
-                if (err) {
-                    err.call();
-                }
-            });
-
-        },
-
-        _handleWheel : function(e) {
-            e.preventDefault();
-            let delta = 1;
-            if (e.deltaY) {
-                delta = e.deltaY > 0 ? 1 : -1;
-            } else if (e.wheelDelta) {
-                delta = -e.wheelDelta / 120;
-            } else if (e.detail) {
-                delta = e.detail > 0 ? 1 : -1;
-            }
-            const ratio = -delta * this.options.ratioThreshold;
-            const pointer = {
-                x: e.clientX - this.$stage.offset().left + Constants.$D.scrollLeft(),
-                y: e.clientY - this.$stage.offset().top + Constants.$D.scrollTop()
-            };
-            this.zoom(ratio, pointer, e);
-        },
-
-        zoom : function(ratio, origin, e) {
-            ratio = ratio < 0 ? 1 / (1 - ratio) : 1 + ratio;
-            ratio = this.$image.width() / this.imageData.originalWidth * ratio;
-            if (ratio > this.options.maxRatio || ratio < this.options.minRatio) {
-                return;
-            }
-            this.zoomTo(ratio, origin, e);
-        },
-
-        zoomTo : function(ratio, origin, e) {
-            const $image = this.$image;
-            const $stage = this.$stage;
-            const imgData = {
-                w: this.imageData.width,
-                h: this.imageData.height,
-                x: this.imageData.left,
-                y: this.imageData.top
-            };
-            const stageData = {
-                w: $stage.width(),
-                h: $stage.height(),
-                x: $stage.offset().left,
-                y: $stage.offset().top
-            };
-            const newWidth = this.imageData.originalWidth * ratio;
-            const newHeight = this.imageData.originalHeight * ratio;
-            let newLeft = origin.x - (origin.x - imgData.x) / imgData.w * newWidth;
-            let newTop = origin.y - (origin.y - imgData.y) / imgData.h * newHeight;
-            const δ = !this.isRotated ? 0 : (newWidth - newHeight) / 2;
-            const imgNewWidth = !this.isRotated ? newWidth : newHeight;
-            const imgNewHeight = !this.isRotated ? newHeight : newWidth;
-            const offsetX = stageData.w - newWidth;
-            const offsetY = stageData.h - newHeight;
-            if (imgNewHeight <= stageData.h) {
-                newTop = (stageData.h - newHeight) / 2;
-            } else {
-                newTop = newTop > δ ? δ : newTop > offsetY - δ ? newTop : offsetY - δ;
-            }
-            if (imgNewWidth <= stageData.w) {
-                newLeft = (stageData.w - newWidth) / 2;
-            } else {
-                newLeft = newLeft > -δ ? -δ : newLeft > offsetX + δ ? newLeft : offsetX + δ;
-            }
-            if (Math.abs(this.imageData.initWidth - newWidth) < this.imageData.initWidth * 0.05) {
-                this.setImageSize(this.img);
-            } else {
-                $image.css({
-                    width: Math.round(newWidth) + 'px',
-                    height: Math.round(newHeight) + 'px',
-                    left: Math.round(newLeft) + 'px',
-                    top: Math.round(newTop) + 'px'
-                });
-                Utilities.setGrabCursor({
-                    w: Math.round(imgNewWidth),
-                    h: Math.round(imgNewHeight)
-                }, {
-                    w: stageData.w,
-                    h: stageData.h
-                }, this.$stage);
-            }
-            $.extend(this.imageData, {
-                width: newWidth,
-                height: newHeight,
-                left: newLeft,
-                top: newTop
-            });
-        },
-
-        rotate : function(angle) {
-            this.rotateAngle = this.rotateAngle + angle;
-            if (this.rotateAngle / 90 % 2 === 0) {
-                this.isRotated = false;
-            } else {
-                this.isRotated = true;
-            }
-            this.rotateTo(this.rotateAngle);
-        },
-        rotateTo: function(angle) {
-            this.$image.css({ transform: 'rotate(' + angle + 'deg)' });
-            this.setImageSize({
-                width: this.imageData.originalWidth,
-                height: this.imageData.originalHeight
-            });
-            this.$stage.removeClass('is-grab');
-        },
-        resize: function() {
-            const imageWidth = this.$image.width();
-            const imageHeight = this.$image.height();
-            const stageWidth = this.$stage.width();
-            const stageHeight = this.$stage.height();
-            const left = (stageWidth - imageWidth) /2;
-            const top = (stageHeight- imageHeight) /2;
-            this.$image.css({
-                left,
-                top
-            });
-        },
-
-        shortcut: function(keyCode,ctrlKey,altKey) {
-            var handled = false;
-            switch (keyCode) {
-                // +
-                case 187:
-                    this.zoom(this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    handled = true;
-                    break;
-                // -
-                case 189:
-                    this.zoom(-this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    handled = true;
-                    break;
-                // + Firefox
-                case 61:
-                    this.zoom(this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    handled = true;
-                    break;
-                // - Firefox
-                case 173:
-                    this.zoom(-this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    handled = true;
-                    break;
-                // Ctrl + Alt + 0
-                case 48:
-                    if (ctrlKey && altKey) {
-                        this.zoomTo(1, {
-                            x: this.$stage.width() / 2,
-                            y: this.$stage.height() / 2
-                        }, e);
-                    }
-                    handled = true;
-                    break;
-                // Ctrl + ,
-                case 188:
-                    if (ctrlKey) {
-                        this.rotate(-90);
-                    }
-                    break;
-                // Ctrl + .
-                case 190:
-                    if (ctrlKey) {
-                        this.rotate(90);
-                    }
-                    handled = true;
-                    break;
-                default:
-            }
-
-            return handled;
-        }
-    });
-
-    return Imager;
-});
 define('skylark-photoviewer/core',[
+    "skylark-domx-plugins-pictures/viewer",
     './domq',
     './defaults',
     './constants',
     './utilities',
     "./window",
-    "./picture_viewer"
-], function ($, DEFAULTS, Constants, Utilities, Window,Imager) {
+], function (Imager,$, DEFAULTS, Constants, Utilities, Window) {
     'use strict';
 
     
@@ -23263,7 +23329,17 @@ define('skylark-photoviewer/core',[
                 dragHandle : this.options.dragHandle,
 
             });
-            this._imager = new Imager(this.$stage[0]);
+            this._imager = new Imager(this.$stage[0],{
+                ratioThreshold: this.options.ratioThreshold,
+                minRatio: this.options.minRatio,
+                maxRatio: this.options.maxRatio,
+                movable : true,
+
+                classes : {
+                    grab : "is-grab",
+                    loader : "${ Constants.NS }-loader"
+                }                
+            });
 
             this._addEvents();
             this._addCustomButtonEvents();

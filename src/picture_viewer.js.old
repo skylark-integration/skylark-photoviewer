@@ -1,12 +1,12 @@
 define([
-    "skylark-domx-eventer",
+    "skylark-langx",
+    "skylark-domx/eventer",
+    "skylark-domx/geom",
+    "skylark-domx/query",
+    "skylark-domx-images/preload",
     "skylark-domx-plugins-base",
-    "skylark-domx-plugins-interact/movable",
-    'skylark-jquery',
-    './constants',
-    './utilities'
-
-], function (eventer,plugins,Movable,$,  Constants, Utilities) {
+    "skylark-domx-plugins-interact/movable"
+], function (langx,eventer,geom,$,preload,plugins,Movable) {
     'use strict';
 
     var Imager = plugins.Plugin.inherit({
@@ -18,7 +18,12 @@ define([
             ratioThreshold: 0.1,
             minRatio: 0.05,
             maxRatio: 16,
-            movable : true
+            movable : true,
+
+            classes : {
+                grab : null,
+                loader : null
+            }
         },
 
         _construct : function(elm,options) {
@@ -28,23 +33,22 @@ define([
             this.$image = this.$stage.find("img");
             
 
-            this.$stage.off(Constants.WHEEL_EVENT + Constants.EVENT_NS).on(Constants.WHEEL_EVENT + Constants.EVENT_NS, e => {
+            this.$stage.off("wheel").on("wheel", e => {
                 this._handleWheel(e);
             });
 
             if (this.options.movable) {
                 this._movable = new Movable(this.$image[0],{
                     starting : (e) => {
-                        if (this.$stage.hasClass('is-grab')) {
-
-                        } else {
-                            return false;
-                        }
                         const imageWidth = this.$image.width();
                         const imageHeight = this.$image.height();
                         const stageWidth = this.$stage.width();
                         const stageHeight = this.$stage.height();
                         let minX,minY,maxX,maxY;
+
+                        if (stageWidth>=imageWidth && stageHeight>=imageHeight) {
+                            return false;
+                        }
 
                         if (stageWidth>=imageWidth) {
                             minX=maxX=(stageWidth-imageWidth) / 2;
@@ -87,6 +91,17 @@ define([
             return scale;
         },
 
+        setGrabCursor : function (imageData, stageData, isRotated) {
+            const imageWidth = !isRotated ? imageData.w : imageData.h;
+            const imageHeight = !isRotated ? imageData.h : imageData.w;
+            if (imageHeight > stageData.h || imageWidth > stageData.w) {
+                this.$stage.addClass('is-grab');
+            }
+            if (imageHeight <= stageData.h && imageWidth <= stageData.w) {
+                this.$stage.removeClass('is-grab');
+            }
+        },
+
         setImageSize: function(img) {
             const stageData = {
                 w: this.$stage.width(),
@@ -99,7 +114,7 @@ define([
                 left: (stageData.w - Math.ceil(img.width * scale)) / 2 + 'px',
                 top: (stageData.h - Math.ceil(img.height * scale)) / 2 + 'px'
             });
-            $.extend(this.imageData, {
+            langx.mixin(this.imageData, {
                 initWidth: img.width * scale,
                 initHeight: img.height * scale,
                 initLeft: (stageData.w - img.width * scale) / 2,
@@ -109,15 +124,15 @@ define([
                 left: (stageData.w - img.width * scale) / 2,
                 top: (stageData.h - img.height * scale) / 2
             });
-            Utilities.setGrabCursor({
+            this.setGrabCursor({
                 w: this.$image.width(),
                 h: this.$image.height()
             }, {
                 w: this.$stage.width(),
                 h: this.$stage.height()
-            }, this.$stage, this.isRotated);
+            }, this.isRotated);
             if (!this.imageLoaded) {
-                this.$stage.find(Constants.CLASS_NS + '-loader').remove();
+                this.$stage.find(".${ this.options.classes.loader }").remove();
                 this.$stage.removeClass('stage-ready');
                 this.$image.removeClass('image-ready');
                 if (this.options.initAnimation && !this.options.progressiveLoading) {
@@ -132,14 +147,15 @@ define([
             this.isRotated = false;
             this.rotateAngle = 0;
             this.imageLoaded = false;
-            this.$stage.append(`<div class="${ Constants.NS }-loader"></div>`);
+            this.$stage.append(`<div class="${ this.options.classes.loader }"></div>`);
             this.$stage.addClass('stage-ready');
             this.$image.addClass('image-ready');
             if (this.options.initAnimation && !this.options.progressiveLoading) {
                 this.$image.hide();
             }
             this.$image.attr('src', imgSrc);
-            Utilities.preloadImage(imgSrc, img => {
+            preload(imgSrc).then((data) => {
+                var img = data.imgs[0];
                 this.img = img;
                 this.imageData = {
                     originalWidth: img.width,
@@ -154,7 +170,7 @@ define([
                     fn(img);
                 }
             }, () => {
-                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
+                this.$photoviewer.find(".${ this.options.classes.loader }").remove();
                 if (err) {
                     err.call();
                 }
@@ -174,8 +190,8 @@ define([
             }
             const ratio = -delta * this.options.ratioThreshold;
             const pointer = {
-                x: e.clientX - this.$stage.offset().left + Constants.$D.scrollLeft(),
-                y: e.clientY - this.$stage.offset().top + Constants.$D.scrollTop()
+                x: e.clientX - this.$stage.offset().left + geom.scrollLeft(document.body),
+                y: e.clientY - this.$stage.offset().top + geom.scrollTop(document.body)
             };
             this.zoom(ratio, pointer, e);
         },
@@ -232,13 +248,13 @@ define([
                     left: Math.round(newLeft) + 'px',
                     top: Math.round(newTop) + 'px'
                 });
-                Utilities.setGrabCursor({
+                this.setGrabCursor({
                     w: Math.round(imgNewWidth),
                     h: Math.round(imgNewHeight)
                 }, {
                     w: stageData.w,
                     h: stageData.h
-                }, this.$stage);
+                });
             }
             $.extend(this.imageData, {
                 width: newWidth,
