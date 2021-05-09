@@ -234,6 +234,7 @@ define([
                     Constants.PUBLIC_VARS['isResizing'] = true;
                 },
                 moving : function(e) {
+                    
                     const imageWidth = $(image).width();
                     const imageHeight = $(image).height();
                     const stageWidth = $(stage).width();

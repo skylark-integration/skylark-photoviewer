@@ -3,11 +3,12 @@ define([
     './defaults',
     './constants',
     './utilities',
-    './draggable',
-    './movable',
-    './resizable'
-], function ($, DEFAULTS, Constants, Utilities, draggable, movable, resizable) {
+    "./window",
+    "./picture_viewer"
+], function ($, DEFAULTS, Constants, Utilities, Window,Imager) {
     'use strict';
+
+    
     class PhotoViewer {
         constructor(items, options, el) {
             this.options = $.extend(true, {}, DEFAULTS, options);
@@ -39,15 +40,15 @@ define([
             const imgSrc = items[this.groupIndex]['src'];
             this.open();
             this.loadImage(imgSrc);
-            if (opts.draggable) {
-                this.draggable(this.$photoviewer, this.dragHandle, Constants.CLASS_NS + '-button');
-            }
-            if (opts.movable) {
-                this.movable(this.$stage, this.$image);
-            }
-            if (opts.resizable) {
-                this.resizable(this.$photoviewer, this.$stage, this.$image, opts.modalWidth, opts.modalHeight);
-            }
+            ///if (opts.draggable) {
+            ///    this.draggable(this.$photoviewer, this.dragHandle, Constants.CLASS_NS + '-button');
+            ///}
+            ///if (opts.movable) {
+            ///    this.movable(this.$stage, this.$image);
+            ///}
+            ///if (opts.resizable) {
+            ///    this.resizable(this.$photoviewer, this.$stage, this.$image, opts.modalWidth, opts.modalHeight);
+            ///}
         }
         _createBtns(toolbar) {
             const btns = [
@@ -129,8 +130,19 @@ define([
                 this.dragHandle = this.$photoviewer.find(this.options.dragHandle);
             }
             $(this.options.appendTo).eq(0).append(this.$photoviewer);
+
+            this._window = new Window(this.$photoviewer[0],{
+                dragHandle : this.options.dragHandle,
+
+            });
+            this._imager = new Imager(this.$stage[0]);
+
             this._addEvents();
             this._addCustomButtonEvents();
+
+            this.$photoviewer.on("resized",()=>{
+                this._imager.resize();;
+            });
         }
         open() {
             this._triggerHook('beforeOpen', this);
@@ -152,25 +164,7 @@ define([
             this._triggerHook('opened', this);
         }
         close() {
-            this._triggerHook('beforeClose', this);
-            this.$photoviewer.remove();
-            this.isOpened = false;
-            this.isMaximized = false;
-            this.isRotated = false;
-            this.rotateAngle = 0;
-            if (!$(Constants.CLASS_NS + '-modal').length) {
-                if (this.options.fixedContent) {
-                    $('html').css({
-                        overflow: '',
-                        'padding-right': ''
-                    });
-                }
-                if (this.options.multiInstances) {
-                    Constants.PUBLIC_VARS['zIndex'] = this.options.zIndex;
-                }
-                Constants.$W.off(Constants.RESIZE_EVENT + Constants.EVENT_NS);
-            }
-            this._triggerHook('closed', this);
+            this._window.close();
         }
         setModalPos(modal) {
             const winWidth = Constants.$W.width();
@@ -237,86 +231,17 @@ define([
             }
             this.isOpened = true;
         }
-        getImageScaleToStage(stageWidth, stageHeight) {
-            let scale = 1;
-            if (!this.isRotated) {
-                scale = Math.min(stageWidth / this.img.width, stageHeight / this.img.height, 1);
-            } else {
-                scale = Math.min(stageWidth / this.img.height, stageHeight / this.img.width, 1);
-            }
-            return scale;
-        }
+
         setImageSize(img) {
-            const stageData = {
-                w: this.$stage.width(),
-                h: this.$stage.height()
-            };
-            const scale = this.getImageScaleToStage(stageData.w, stageData.h);
-            this.$image.css({
-                width: Math.ceil(img.width * scale) + 'px',
-                height: Math.ceil(img.height * scale) + 'px',
-                left: (stageData.w - Math.ceil(img.width * scale)) / 2 + 'px',
-                top: (stageData.h - Math.ceil(img.height * scale)) / 2 + 'px'
-            });
-            $.extend(this.imageData, {
-                initWidth: img.width * scale,
-                initHeight: img.height * scale,
-                initLeft: (stageData.w - img.width * scale) / 2,
-                initTop: (stageData.h - img.height * scale) / 2,
-                width: img.width * scale,
-                height: img.height * scale,
-                left: (stageData.w - img.width * scale) / 2,
-                top: (stageData.h - img.height * scale) / 2
-            });
-            Utilities.setGrabCursor({
-                w: this.$image.width(),
-                h: this.$image.height()
-            }, {
-                w: this.$stage.width(),
-                h: this.$stage.height()
-            }, this.$stage, this.isRotated);
-            if (!this.imageLoaded) {
-                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
-                this.$stage.removeClass('stage-ready');
-                this.$image.removeClass('image-ready');
-                if (this.options.initAnimation && !this.options.progressiveLoading) {
-                    this.$image.fadeIn();
-                }
-                this.imageLoaded = true;
-            }
+            this._imager.setImageSize(img);
         }
         loadImage(imgSrc, fn, err) {
-            this.$image.removeAttr('style').attr('src', '');
-            this.isRotated = false;
-            this.rotateAngle = 0;
-            this.imageLoaded = false;
-            this.$photoviewer.append(`<div class="${ Constants.NS }-loader"></div>`);
-            this.$stage.addClass('stage-ready');
-            this.$image.addClass('image-ready');
-            if (this.options.initAnimation && !this.options.progressiveLoading) {
-                this.$image.hide();
-            }
-            this.$image.attr('src', imgSrc);
-            Utilities.preloadImage(imgSrc, img => {
-                this.img = img;
-                this.imageData = {
-                    originalWidth: img.width,
-                    originalHeight: img.height
-                };
-                if (this.isMaximized || this.isOpened && this.options.fixedModalPos) {
-                    this.setImageSize(img);
-                } else {
-                    this.setModalSize(img);
-                }
+            this._imager.loadImage(imgSrc,(img) => {
+                this.setModalSize(img);
                 if (fn) {
                     fn.call();
                 }
-            }, () => {
-                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
-                if (err) {
-                    err.call();
-                }
-            });
+            },err);
             if (this.options.title) {
                 this.setImageTitle(imgSrc);
             }
@@ -353,161 +278,26 @@ define([
                 ]);
             });
         }
-        wheel(e) {
-            e.preventDefault();
-            let delta = 1;
-            if (e.deltaY) {
-                delta = e.deltaY > 0 ? 1 : -1;
-            } else if (e.wheelDelta) {
-                delta = -e.wheelDelta / 120;
-            } else if (e.detail) {
-                delta = e.detail > 0 ? 1 : -1;
-            }
-            const ratio = -delta * this.options.ratioThreshold;
-            const pointer = {
-                x: e.clientX - this.$stage.offset().left + Constants.$D.scrollLeft(),
-                y: e.clientY - this.$stage.offset().top + Constants.$D.scrollTop()
-            };
-            this.zoom(ratio, pointer, e);
-        }
         zoom(ratio, origin, e) {
-            ratio = ratio < 0 ? 1 / (1 - ratio) : 1 + ratio;
-            ratio = this.$image.width() / this.imageData.originalWidth * ratio;
-            if (ratio > this.options.maxRatio || ratio < this.options.minRatio) {
-                return;
-            }
-            this.zoomTo(ratio, origin, e);
+            this._imager.zoom(ratio,origin,e);
         }
         zoomTo(ratio, origin, e) {
-            const $image = this.$image;
-            const $stage = this.$stage;
-            const imgData = {
-                w: this.imageData.width,
-                h: this.imageData.height,
-                x: this.imageData.left,
-                y: this.imageData.top
-            };
-            const stageData = {
-                w: $stage.width(),
-                h: $stage.height(),
-                x: $stage.offset().left,
-                y: $stage.offset().top
-            };
-            const newWidth = this.imageData.originalWidth * ratio;
-            const newHeight = this.imageData.originalHeight * ratio;
-            let newLeft = origin.x - (origin.x - imgData.x) / imgData.w * newWidth;
-            let newTop = origin.y - (origin.y - imgData.y) / imgData.h * newHeight;
-            const δ = !this.isRotated ? 0 : (newWidth - newHeight) / 2;
-            const imgNewWidth = !this.isRotated ? newWidth : newHeight;
-            const imgNewHeight = !this.isRotated ? newHeight : newWidth;
-            const offsetX = stageData.w - newWidth;
-            const offsetY = stageData.h - newHeight;
-            if (imgNewHeight <= stageData.h) {
-                newTop = (stageData.h - newHeight) / 2;
-            } else {
-                newTop = newTop > δ ? δ : newTop > offsetY - δ ? newTop : offsetY - δ;
-            }
-            if (imgNewWidth <= stageData.w) {
-                newLeft = (stageData.w - newWidth) / 2;
-            } else {
-                newLeft = newLeft > -δ ? -δ : newLeft > offsetX + δ ? newLeft : offsetX + δ;
-            }
-            if (Math.abs(this.imageData.initWidth - newWidth) < this.imageData.initWidth * 0.05) {
-                this.setImageSize(this.img);
-            } else {
-                $image.css({
-                    width: Math.round(newWidth) + 'px',
-                    height: Math.round(newHeight) + 'px',
-                    left: Math.round(newLeft) + 'px',
-                    top: Math.round(newTop) + 'px'
-                });
-                Utilities.setGrabCursor({
-                    w: Math.round(imgNewWidth),
-                    h: Math.round(imgNewHeight)
-                }, {
-                    w: stageData.w,
-                    h: stageData.h
-                }, this.$stage);
-            }
-            $.extend(this.imageData, {
-                width: newWidth,
-                height: newHeight,
-                left: newLeft,
-                top: newTop
-            });
+            this._imager.zoomTo(ratio,origin,e);
         }
         rotate(angle) {
-            this.rotateAngle = this.rotateAngle + angle;
-            if (this.rotateAngle / 90 % 2 === 0) {
-                this.isRotated = false;
-            } else {
-                this.isRotated = true;
-            }
-            this.rotateTo(this.rotateAngle);
+            this._imager.rotate(angle);
         }
         rotateTo(angle) {
-            this.$image.css({ transform: 'rotate(' + angle + 'deg)' });
-            this.setImageSize({
-                width: this.imageData.originalWidth,
-                height: this.imageData.originalHeight
-            });
-            this.$stage.removeClass('is-grab');
+            this._imager.rotateTo(angle);
         }
         resize() {
-            const resizeHandler = Utilities.throttle(() => {
-                if (this.isOpened) {
-                    if (this.isMaximized) {
-                        this.setImageSize({
-                            width: this.imageData.originalWidth,
-                            height: this.imageData.originalHeight
-                        });
-                    } else {
-                        this.setModalSize({
-                            width: this.imageData.originalWidth,
-                            height: this.imageData.originalHeight
-                        });
-                    }
-                }
-            }, 500);
-            return resizeHandler;
+            return this._imager.resize();
         }
         maximize() {
-            this.$photoviewer.get(0).focus();
-            if (!this.isMaximized) {
-                this.modalData = {
-                    width: this.$photoviewer.width(),
-                    height: this.$photoviewer.height(),
-                    left: this.$photoviewer.offset().left,
-                    top: this.$photoviewer.offset().top
-                };
-                this.$photoviewer.addClass(Constants.NS + '-maximize');
-                this.$photoviewer.css({
-                    width: '100%',
-                    height: '100%',
-                    left: 0,
-                    top: 0
-                });
-                this.isMaximized = true;
-            } else {
-                this.$photoviewer.removeClass(Constants.NS + '-maximize');
-                const initModalLeft = (Constants.$W.width() - this.options.modalWidth) / 2 + Constants.$D.scrollLeft();
-                const initModalTop = (Constants.$W.height() - this.options.modalHeight) / 2 + Constants.$D.scrollTop();
-                this.$photoviewer.css({
-                    width: this.modalData.width ? this.modalData.width : this.options.modalWidth,
-                    height: this.modalData.height ? this.modalData.height : this.options.modalHeight,
-                    left: this.modalData.left ? this.modalData.left : initModalLeft,
-                    top: this.modalData.top ? this.modalData.top : initModalTop
-                });
-                this.isMaximized = false;
-            }
-            this.setImageSize({
-                width: this.imageData.originalWidth,
-                height: this.imageData.originalHeight
-            });
+            this._window.maximize();
         }
         fullscreen() {
-            this.$photoviewer.get(0).focus();
-            Utilities.requestFullscreen(this.$photoviewer[0]);
+            this._window.fullscreen();
         }
         _keydown(e) {
             if (!this.options.keyboard) {
@@ -525,55 +315,6 @@ define([
                 case 39:
                     this.jump(1);
                     break;
-                // +
-                case 187:
-                    this.zoom(this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // -
-                case 189:
-                    this.zoom(-this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // + Firefox
-                case 61:
-                    this.zoom(this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // - Firefox
-                case 173:
-                    this.zoom(-this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // Ctrl + Alt + 0
-                case 48:
-                    if (ctrlKey && altKey) {
-                        this.zoomTo(1, {
-                            x: this.$stage.width() / 2,
-                            y: this.$stage.height() / 2
-                        }, e);
-                    }
-                    break;
-                // Ctrl + ,
-                case 188:
-                    if (ctrlKey) {
-                        this.rotate(-90);
-                    }
-                    break;
-                // Ctrl + .
-                case 190:
-                    if (ctrlKey) {
-                        this.rotate(90);
-                    }
-                    break;
                 // Q
                 case 81:
                     this.close();
@@ -582,12 +323,7 @@ define([
             }
         }
         _addEvents() {
-            this.$close.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, e => {
-                this.close();
-            });
-            this.$stage.off(Constants.WHEEL_EVENT + Constants.EVENT_NS).on(Constants.WHEEL_EVENT + Constants.EVENT_NS, e => {
-                this.wheel(e);
-            });
+
             this.$zoomIn.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, e => {
                 this.zoom(this.options.ratioThreshold * 3, {
                     x: this.$stage.width() / 2,
@@ -609,9 +345,7 @@ define([
             this.$prev.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
                 this.jump(-1);
             });
-            this.$fullscreen.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
-                this.fullscreen();
-            });
+
             this.$next.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
                 this.jump(1);
             });
@@ -621,13 +355,11 @@ define([
             this.$rotateRight.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
                 this.rotate(90);
             });
-            this.$maximize.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
-                this.maximize();
-            });
+
             this.$photoviewer.off(Constants.KEYDOWN_EVENT + Constants.EVENT_NS).on(Constants.KEYDOWN_EVENT + Constants.EVENT_NS, e => {
                 this._keydown(e);
             });
-            Constants.$W.on(Constants.RESIZE_EVENT + Constants.EVENT_NS, this.resize());
+            ///Constants.$W.on(Constants.RESIZE_EVENT + Constants.EVENT_NS, this.resize());
         }
         _addCustomButtonEvents() {
             for (const btnKey in this.options.customButtons) {
@@ -645,7 +377,10 @@ define([
             }
         }
     }
-    $.extend(PhotoViewer.prototype, draggable, movable, resizable);
+    //$.extend(PhotoViewer.prototype, draggable, movable, resizable);
+
+    ///$.extend(PhotoViewer.prototype, movable);
+
     window.PhotoViewer = PhotoViewer;
     return PhotoViewer;
 });

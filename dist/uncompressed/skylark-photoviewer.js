@@ -359,471 +359,595 @@ define('skylark-photoviewer/constants',[
         PUBLIC_VARS: PUBLIC_VARS
     };
 });
-define('skylark-photoviewer/draggable',[
-    "skylark-domx-plugins-interact/movable",
-    './domq',
-    './constants'
-], function (_movable,$, Constants) {
-    'use strict';
-    return {
-        draggable(modal, dragHandle, dragCancel) {
-            /*
-            let isDragging = false;
-            let startX = 0;
-            let startY = 0;
-            let left = 0;
-            let top = 0;
-            const dragStart = e => {
-                e = e || window.event;
-                modal.get(0).focus();
-                const elemCancel = $(e.target).closest(dragCancel);
-                if (elemCancel.length) {
-                    return true;
-                }
-                if (this.options.multiInstances) {
-                    modal.css('z-index', ++Constants.PUBLIC_VARS['zIndex']);
-                }
-                isDragging = true;
-                startX = e.type === 'touchstart' ? e.targetTouches[0].pageX : e.clientX;
-                startY = e.type === 'touchstart' ? e.targetTouches[0].pageY : e.clientY;
-                left = $(modal).offset().left;
-                top = $(modal).offset().top;
-                Constants.$D.on(Constants.TOUCH_MOVE_EVENT + Constants.EVENT_NS, dragMove).on(Constants.TOUCH_END_EVENT + Constants.EVENT_NS, dragEnd);
-            };
-            const dragMove = e => {
-                e = e || window.event;
-                e.preventDefault();
-                if (isDragging && !Constants.PUBLIC_VARS['isMoving'] && !Constants.PUBLIC_VARS['isResizing'] && !this.isMaximized) {
-                    const endX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.clientX;
-                    const endY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.clientY;
-                    const relativeX = endX - startX;
-                    const relativeY = endY - startY;
-                    $(modal).css({
-                        left: relativeX + left + 'px',
-                        top: relativeY + top + 'px'
-                    });
-                }
-            };
-            const dragEnd = () => {
-                Constants.$D.off(Constants.TOUCH_MOVE_EVENT + Constants.EVENT_NS, dragMove).off(Constants.TOUCH_END_EVENT + Constants.EVENT_NS, dragEnd);
-                isDragging = false;
-            };
-            $(dragHandle).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
-            */
-            var self = this;
-            _movable($(modal)[0],{
-                handle : $(dragHandle)[0],
-                starting : function(e) {
-                    const elemCancel = $(e.target).closest(dragCancel);
-                    if (elemCancel.length) {
-                        return false;
-                    }
-                    if (Constants.PUBLIC_VARS['isResizing'] || self.isMaximized) {
-                        return false;
-                    }
-
-                    return true;
-                }
-            });
-        }
-    };
-});
-define('skylark-photoviewer/movable',[
+define('skylark-photoviewer/window',[
     "skylark-domx-eventer",
+    "skylark-domx-plugins-base",
+    'skylark-jquery',
     "skylark-domx-plugins-interact/movable",
-    './domq',
-    './constants'
-], function (eventer,_movable,$, Constants) {
-    'use strict';
-    const ELEMS_WITH_GRABBING_CURSOR = `html, body, .${ Constants.NS }-modal, .${ Constants.NS }-stage, .${ Constants.NS }-button, .${ Constants.NS }-resizable-handle`;
-    return {
-        movable(stage, image) {
-            /*
-            let isDragging = false;
-            let startX = 0;
-            let startY = 0;
-            let left = 0;
-            let top = 0;
-            let widthDiff = 0;
-            let heightDiff = 0;
-            let δ = 0;
-            const dragStart = e => {
-                e = e || window.event;
-                e.preventDefault();
-                const imageWidth = $(image).width();
-                const imageHeight = $(image).height();
-                const stageWidth = $(stage).width();
-                const stageHeight = $(stage).height();
-                startX = e.type === 'touchstart' ? e.targetTouches[0].pageX : e.clientX;
-                startY = e.type === 'touchstart' ? e.targetTouches[0].pageY : e.clientY;
-                δ = !this.isRotated ? 0 : (imageWidth - imageHeight) / 2;
-                widthDiff = !this.isRotated ? imageWidth - stageWidth : imageHeight - stageWidth;
-                heightDiff = !this.isRotated ? imageHeight - stageHeight : imageWidth - stageHeight;
-                isDragging = widthDiff > 0 || heightDiff > 0 ? true : false;
-                Constants.PUBLIC_VARS['isMoving'] = widthDiff > 0 || heightDiff > 0 ? true : false;
-                left = $(image).position().left - δ;
-                top = $(image).position().top + δ;
-                if (stage.hasClass('is-grab')) {
-                    $(ELEMS_WITH_GRABBING_CURSOR).addClass('is-grabbing');
-                }
-                Constants.$D.on(Constants.TOUCH_MOVE_EVENT + Constants.EVENT_NS, dragMove).on(Constants.TOUCH_END_EVENT + Constants.EVENT_NS, dragEnd);
-            };
-            const dragMove = e => {
-                e = e || window.event;
-                e.preventDefault();
-                if (isDragging) {
-                    const endX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.clientX;
-                    const endY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.clientY;
-                    const relativeX = endX - startX;
-                    const relativeY = endY - startY;
-                    let newLeft = relativeX + left;
-                    let newTop = relativeY + top;
-                    if (heightDiff > 0) {
-                        if (relativeY + top > δ) {
-                            newTop = δ;
-                        } else if (relativeY + top < -heightDiff + δ) {
-                            newTop = -heightDiff + δ;
-                        }
-                    } else {
-                        newTop = top;
-                    }
-                    if (widthDiff > 0) {
-                        if (relativeX + left > -δ) {
-                            newLeft = -δ;
-                        } else if (relativeX + left < -widthDiff - δ) {
-                            newLeft = -widthDiff - δ;
-                        }
-                    } else {
-                        newLeft = left;
-                    }
-                    $(image).css({
-                        left: newLeft + 'px',
-                        top: newTop + 'px'
-                    });
-                    $.extend(this.imageData, {
-                        left: newLeft,
-                        top: newTop
-                    });
-                }
-            };
-            const dragEnd = () => {
-                Constants.$D.off(Constants.TOUCH_MOVE_EVENT + Constants.EVENT_NS, dragMove).off(Constants.TOUCH_END_EVENT + Constants.EVENT_NS, dragEnd);
-                isDragging = false;
-                Constants.PUBLIC_VARS['isMoving'] = false;
-                $(ELEMS_WITH_GRABBING_CURSOR).removeClass('is-grabbing');
-            };
-            $(stage).on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, dragStart);
-            */
-            
-            
-
-            return _movable(image[0],{
-                starting : function(e) {
-                    if (stage.hasClass('is-grab')) {
-
-                    } else {
-                        return false;
-                    }
-                    const imageWidth = $(image).width();
-                    const imageHeight = $(image).height();
-                    const stageWidth = $(stage).width();
-                    const stageHeight = $(stage).height();
-                    let minX,minY,maxX,maxY;
-
-                    if (stageWidth>=imageWidth) {
-                        minX=maxX=(stageWidth-imageWidth) / 2;
-                    } else {
-                        minX = stageWidth - imageWidth;
-                        maxX = 0;
-                    }
-
-                    if (stageHeight>=imageHeight) {
-                        minY=maxY=(stageHeight-imageHeight) / 2;
-                    } else {
-                        minY = stageHeight - imageHeight;
-                        maxY = 0;
-                    }
-
-                    return {
-                        constraints : {
-                             minX,
-                            maxX,
-                            minY,
-                            maxY
-                        }
-                    };
-                },
-                started : function(e) {
-                    eventer.stop(e);
-                }
-            });
-        }
-    };
-});
-define('skylark-photoviewer/resizable',[
-    "skylark-domx-eventer",
     "skylark-domx-plugins-interact/resizable",
-    './domq',
     './constants',
     './utilities'
-], function (eventer,_Resizable,$, Constants, Utilities) {
+
+], function (eventer,plugins,$,  Movable, Resizable, Constants, Utilities,) {
     'use strict';
-    const ELEMS_WITH_RESIZE_CURSOR = `html, body, .${ Constants.NS }-modal, .${ Constants.NS }-stage, .${ Constants.NS }-button`;
-    return {
-        resizable(modal, stage, image, minWidth, minHeight) {
-            /*
-            const resizableHandleE = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-e"></div>`);
-            const resizableHandleW = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-w"></div>`);
-            const resizableHandleS = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-s"></div>`);
-            const resizableHandleN = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-n"></div>`);
-            const resizableHandleSE = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-se"></div>`);
-            const resizableHandleSW = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-sw"></div>`);
-            const resizableHandleNE = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-ne"></div>`);
-            const resizableHandleNW = $(`<div class="${ Constants.NS }-resizable-handle ${ Constants.NS }-resizable-handle-nw"></div>`);
-            const resizableHandles = {
-                e: resizableHandleE,
-                s: resizableHandleS,
-                se: resizableHandleSE,
-                n: resizableHandleN,
-                w: resizableHandleW,
-                nw: resizableHandleNW,
-                ne: resizableHandleNE,
-                sw: resizableHandleSW
-            };
-            $(modal).append(resizableHandleE, resizableHandleW, resizableHandleS, resizableHandleN, resizableHandleSE, resizableHandleSW, resizableHandleNE, resizableHandleNW);
-            let isDragging = false;
-            let startX = 0;
-            let startY = 0;
-            let modalData = {
-                w: 0,
-                h: 0,
-                l: 0,
-                t: 0
-            };
-            let stageData = {
-                w: 0,
-                h: 0,
-                l: 0,
-                t: 0
-            };
-            let imageData = {
-                w: 0,
-                h: 0,
-                l: 0,
-                t: 0
-            };
-            let δ = 0;
-            let imgWidth = 0;
-            let imgHeight = 0;
-            let direction = '';
-            const getModalOpts = function (dir, offsetX, offsetY) {
-                const modalLeft = -offsetX + modalData.w > minWidth ? offsetX + modalData.l : modalData.l + modalData.w - minWidth;
-                const modalTop = -offsetY + modalData.h > minHeight ? offsetY + modalData.t : modalData.t + modalData.h - minHeight;
-                const opts = {
-                    e: { width: Math.max(offsetX + modalData.w, minWidth) + 'px' },
-                    s: { height: Math.max(offsetY + modalData.h, minHeight) + 'px' },
-                    se: {
-                        width: Math.max(offsetX + modalData.w, minWidth) + 'px',
-                        height: Math.max(offsetY + modalData.h, minHeight) + 'px'
-                    },
-                    w: {
-                        width: Math.max(-offsetX + modalData.w, minWidth) + 'px',
-                        left: modalLeft + 'px'
-                    },
-                    n: {
-                        height: Math.max(-offsetY + modalData.h, minHeight) + 'px',
-                        top: modalTop + 'px'
-                    },
-                    nw: {
-                        width: Math.max(-offsetX + modalData.w, minWidth) + 'px',
-                        height: Math.max(-offsetY + modalData.h, minHeight) + 'px',
-                        top: modalTop + 'px',
-                        left: modalLeft + 'px'
-                    },
-                    ne: {
-                        width: Math.max(offsetX + modalData.w, minWidth) + 'px',
-                        height: Math.max(-offsetY + modalData.h, minHeight) + 'px',
-                        top: modalTop + 'px'
-                    },
-                    sw: {
-                        width: Math.max(-offsetX + modalData.w, minWidth) + 'px',
-                        height: Math.max(offsetY + modalData.h, minHeight) + 'px',
-                        left: modalLeft + 'px'
-                    }
-                };
-                return opts[dir];
-            };
-            const getImageOpts = function (dir, offsetX, offsetY) {
-                const widthDiff = offsetX + modalData.w > minWidth ? stageData.w - imgWidth + offsetX - δ : minWidth - (modalData.w - stageData.w) - imgWidth - δ;
-                const heightDiff = offsetY + modalData.h > minHeight ? stageData.h - imgHeight + offsetY + δ : minHeight - (modalData.h - stageData.h) - imgHeight + δ;
-                const widthDiff2 = -offsetX + modalData.w > minWidth ? stageData.w - imgWidth - offsetX - δ : minWidth - (modalData.w - stageData.w) - imgWidth - δ;
-                const heightDiff2 = -offsetY + modalData.h > minHeight ? stageData.h - imgHeight - offsetY + δ : minHeight - (modalData.h - stageData.h) - imgHeight + δ;
-                const imgLeft = (widthDiff > 0 ? $(image).position().left : $(image).position().left < 0 ? $(image).position().left : 0) - δ;
-                const imgTop = (heightDiff > 0 ? $(image).position().top : $(image).position().top < 0 ? $(image).position().top : 0) + δ;
-                const imgLeft2 = (widthDiff2 > 0 ? $(image).position().left : $(image).position().left < 0 ? $(image).position().left : 0) - δ;
-                const imgTop2 = (heightDiff2 > 0 ? $(image).position().top : $(image).position().top < 0 ? $(image).position().top : 0) + δ;
-                const opts = {
-                    e: { left: widthDiff >= -δ ? (widthDiff - δ) / 2 + 'px' : imgLeft > widthDiff ? imgLeft + 'px' : widthDiff + 'px' },
-                    s: { top: heightDiff >= δ ? (heightDiff + δ) / 2 + 'px' : imgTop > heightDiff ? imgTop + 'px' : heightDiff + 'px' },
-                    se: {
-                        top: heightDiff >= δ ? (heightDiff + δ) / 2 + 'px' : imgTop > heightDiff ? imgTop + 'px' : heightDiff + 'px',
-                        left: widthDiff >= -δ ? (widthDiff - δ) / 2 + 'px' : imgLeft > widthDiff ? imgLeft + 'px' : widthDiff + 'px'
-                    },
-                    w: { left: widthDiff2 >= -δ ? (widthDiff2 - δ) / 2 + 'px' : imgLeft2 > widthDiff2 ? imgLeft2 + 'px' : widthDiff2 + 'px' },
-                    n: { top: heightDiff2 >= δ ? (heightDiff2 + δ) / 2 + 'px' : imgTop2 > heightDiff2 ? imgTop2 + 'px' : heightDiff2 + 'px' },
-                    nw: {
-                        top: heightDiff2 >= δ ? (heightDiff2 + δ) / 2 + 'px' : imgTop2 > heightDiff2 ? imgTop2 + 'px' : heightDiff2 + 'px',
-                        left: widthDiff2 >= -δ ? (widthDiff2 - δ) / 2 + 'px' : imgLeft2 > widthDiff2 ? imgLeft2 + 'px' : widthDiff2 + 'px'
-                    },
-                    ne: {
-                        top: heightDiff2 >= δ ? (heightDiff2 + δ) / 2 + 'px' : imgTop2 > heightDiff2 ? imgTop2 + 'px' : heightDiff2 + 'px',
-                        left: widthDiff >= -δ ? (widthDiff - δ) / 2 + 'px' : imgLeft > widthDiff ? imgLeft + 'px' : widthDiff + 'px'
-                    },
-                    sw: {
-                        top: heightDiff >= δ ? (heightDiff + δ) / 2 + 'px' : imgTop > heightDiff ? imgTop + 'px' : heightDiff + 'px',
-                        left: widthDiff2 >= -δ ? (widthDiff2 - δ) / 2 + 'px' : imgLeft2 > widthDiff2 ? imgLeft2 + 'px' : widthDiff2 + 'px'
-                    }
-                };
-                return opts[dir];
-            };
-            const dragStart = (dir, e) => {
-                e = e || window.event;
-                e.preventDefault();
-                isDragging = true;
-                Constants.PUBLIC_VARS['isResizing'] = true;
-                startX = e.type === 'touchstart' ? e.targetTouches[0].pageX : e.clientX;
-                startY = e.type === 'touchstart' ? e.targetTouches[0].pageY : e.clientY;
-                modalData = {
-                    w: $(modal).width(),
-                    h: $(modal).height(),
-                    l: $(modal).offset().left,
-                    t: $(modal).offset().top
-                };
-                stageData = {
-                    w: $(stage).width(),
-                    h: $(stage).height(),
-                    l: $(stage).offset().left,
-                    t: $(stage).offset().top
-                };
-                imageData = {
-                    w: $(image).width(),
-                    h: $(image).height(),
-                    l: $(image).position().left,
-                    t: $(image).position().top
-                };
-                δ = !this.isRotated ? 0 : (imageData.w - imageData.h) / 2;
-                imgWidth = !this.isRotated ? imageData.w : imageData.h;
-                imgHeight = !this.isRotated ? imageData.h : imageData.w;
-                direction = dir;
-                $(ELEMS_WITH_RESIZE_CURSOR).css('cursor', dir + '-resize');
-                Constants.$D.on(Constants.TOUCH_MOVE_EVENT + Constants.EVENT_NS, dragMove).on(Constants.TOUCH_END_EVENT + Constants.EVENT_NS, dragEnd);
-            };
-            const dragMove = e => {
-                e = e || window.event;
-                e.preventDefault();
-                if (isDragging && !this.isMaximized) {
-                    const endX = e.type === 'touchmove' ? e.targetTouches[0].pageX : e.clientX;
-                    const endY = e.type === 'touchmove' ? e.targetTouches[0].pageY : e.clientY;
-                    const relativeX = endX - startX;
-                    const relativeY = endY - startY;
-                    const modalOpts = getModalOpts(direction, relativeX, relativeY);
-                    $(modal).css(modalOpts);
-                    const imageOpts = getImageOpts(direction, relativeX, relativeY);
-                    $(image).css(imageOpts);
-                    this.isDoResize = true;
+
+    var Window = plugins.Plugin.inherit({
+        klassName : "Window",
+
+        pluginName : "lark.domx.window",
+
+        options : {
+            selectors : {
+                headerPane  : "",
+                contentPane : "",
+                footerPane  : "",
+                titlebar : "",
+                buttons : {
+                    "fullscreen" : ".photoviewer-button-fullscreen",
+                    "maximize" : ".photoviewer-button-maximize",
+                    "minimize" : ".photoviewer-button-minimize",     
+                    "close" : ".photoviewer-button-close"
                 }
-            };
-            const dragEnd = () => {
-                Constants.$D.off(Constants.TOUCH_MOVE_EVENT + Constants.EVENT_NS, dragMove).off(Constants.TOUCH_END_EVENT + Constants.EVENT_NS, dragEnd);
-                if (Constants.PUBLIC_VARS['isResizing']) {
-                    Utilities.setGrabCursor({
-                        w: imgWidth,
-                        h: imgHeight
-                    }, {
-                        w: $(stage).width(),
-                        h: $(stage).height()
-                    }, stage);
-                }
-                isDragging = false;
-                Constants.PUBLIC_VARS['isResizing'] = false;
-                $(ELEMS_WITH_RESIZE_CURSOR).css('cursor', '');
-                const scale = this.getImageScaleToStage($(stage).width(), $(stage).height());
-                $.extend(this.imageData, {
-                    initWidth: this.img.width * scale,
-                    initHeight: this.img.height * scale,
-                    initLeft: ($(stage).width() - this.img.width * scale) / 2,
-                    initTop: ($(stage).height() - this.img.height * scale) / 2
+            },
+
+            fixedContent: true,
+            initMaximized: false,
+
+
+
+
+            movable : {
+                dragHandle: false
+            },
+            resizable : {
+                minWidth: 320,
+                minHeight: 320,
+            }
+        },
+
+        _construct : function(elm,options) {
+            plugins.Plugin.prototype._construct.call(this,elm,options);
+            this.isOpened = false;
+            this.isMaximized = false;
+
+            this.$photoviewer = $(this._elm);
+
+            this._velm = this.elmx();
+
+            if (this.options.movable) {
+                this._movable = new Movable(elm,{
+                    handle : this.options.movable.dragHandle,
+                    starting : (e) => {
+                        const   dragCancel = Constants.CLASS_NS + '-button', 
+                                elemCancel = $(e.target).closest(dragCancel);
+                        if (elemCancel.length) {
+                            return false;
+                        }
+                        if (Constants.PUBLIC_VARS['isResizing'] || this.isMaximized) {
+                            return false;
+                        }
+
+                        return true;
+                    }
                 });
-            };
-            $.each(resizableHandles, function (dir, handle) {
-                handle.on(Constants.TOUCH_START_EVENT + Constants.EVENT_NS, function (e) {
-                    dragStart(dir, e);
+
+            }
+
+            if (this.options.resizable) {
+
+                this._resizable = new Resizable(elm,{
+                    handle : {
+                        border : {
+                            directions : {
+                                top: true, //n
+                                left: true, //w
+                                right: true, //e
+                                bottom: true, //s
+                                topLeft : true, // nw
+                                topRight : true, // ne
+                                bottomLeft : true, // sw
+                                bottomRight : true // se                         
+                            },
+                            classes : {
+                                all : `${ Constants.NS }-resizable-handle`,
+                                top : `${ Constants.NS }-resizable-handle-n`,
+                                left: `${ Constants.NS }-resizable-handle-w`,
+                                right: `${ Constants.NS }-resizable-handle-e`,
+                                bottom: `${ Constants.NS }-resizable-handle-s`, 
+                                topLeft : `${ Constants.NS }-resizable-handle-nw`, 
+                                topRight : `${ Constants.NS }-resizable-handle-ne`,
+                                bottomLeft : `${ Constants.NS }-resizable-handle-sw`,             
+                                bottomRight : `${ Constants.NS }-resizable-handle-se`                         
+                            }                        
+                        }
+                    },
+                    constraints : {
+                        minWidth : this.options.resizable.minWidth,
+                        minHeight : this.options.resizable.minHeight
+                    },
+                    started : function(){
+                        Constants.PUBLIC_VARS['isResizing'] = true;
+                    },
+                    moving : function(e) {
+                        /*
+                        const imageWidth = $(image).width();
+                        const imageHeight = $(image).height();
+                        const stageWidth = $(stage).width();
+                        const stageHeight = $(stage).height();
+                        const left = (stageWidth - imageWidth) /2;
+                        const top = (stageHeight- imageHeight) /2;
+                        $(image).css({
+                            left,
+                            top
+                        });
+                        */
+                    },
+                    stopped :function () {
+                        Constants.PUBLIC_VARS['isResizing'] = false;
+                    }
                 });
+
+            }
+
+            this.$close = this._velm.$(this.options.selectors.buttons.close);
+            this.$maximize = this._velm.$(this.options.selectors.buttons.maximize);
+            this.$minimize = this._velm.$(this.options.selectors.buttons.minimize);
+            this.$fullscreen = this._velm.$(this.options.selectors.buttons.fullscreen);
+
+
+            this.$close.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, e => {
+                this.close();
             });
-            */
-            let self = this;
-            let resizer = new _Resizable($(modal)[0],{
-                handle : {
-                    border : {
-                        directions : {
-                            top: true, //n
-                            left: true, //w
-                            right: true, //e
-                            bottom: true, //s
-                            topLeft : true, // nw
-                            topRight : true, // ne
-                            bottomLeft : true, // sw
-                            bottomRight : true // se                         
-                        },
-                        classes : {
-                            all : `${ Constants.NS }-resizable-handle`,
-                            top : `${ Constants.NS }-resizable-handle-n`,
-                            left: `${ Constants.NS }-resizable-handle-w`,
-                            right: `${ Constants.NS }-resizable-handle-e`,
-                            bottom: `${ Constants.NS }-resizable-handle-s`, 
-                            topLeft : `${ Constants.NS }-resizable-handle-nw`, 
-                            topRight : `${ Constants.NS }-resizable-handle-ne`,
-                            bottomLeft : `${ Constants.NS }-resizable-handle-sw`,             
-                            bottomRight : `${ Constants.NS }-resizable-handle-se`                         
-                        }                        
-                    }
-                },
-                constraints : {
-                    minWidth,
-                    minHeight
-                },
-                started : function(){
-                    Constants.PUBLIC_VARS['isResizing'] = true;
-                },
-                moving : function(e) {
-                    const imageWidth = $(image).width();
-                    const imageHeight = $(image).height();
-                    const stageWidth = $(stage).width();
-                    const stageHeight = $(stage).height();
-                    const left = (stageWidth - imageWidth) /2;
-                    const top = (stageHeight- imageHeight) /2;
-                    $(image).css({
-                        left,
-                        top
+            this.$fullscreen.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
+                this.fullscreen();
+            });
+            this.$maximize.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
+                this.maximize();
+            });
+            this.$photoviewer.off(Constants.KEYDOWN_EVENT + Constants.EVENT_NS).on(Constants.KEYDOWN_EVENT + Constants.EVENT_NS, e => {
+                this._keydown(e);
+            });
+            Constants.$W.on(Constants.RESIZE_EVENT + Constants.EVENT_NS, ()=>{
+                            eventer.resized(this._elm);
+                        });
+        },
+        close: function() {
+            this.trigger('closing', this);
+            this.$photoviewer.remove();
+            this.isOpened = false;
+            this.isMaximized = false;
+
+            if (!$(Constants.CLASS_NS + '-modal').length) {
+                if (this.options.fixedContent) {
+                    $('html').css({
+                        overflow: '',
+                        'padding-right': ''
                     });
-                },
-                stopped :function () {
-                    Constants.PUBLIC_VARS['isResizing'] = false;
+                }
+                if (this.options.multiInstances) {
+                    Constants.PUBLIC_VARS['zIndex'] = this.options.zIndex;
+                }
+                Constants.$W.off(Constants.RESIZE_EVENT + Constants.EVENT_NS);
+            }
+            this.trigger('closed', this);
+        },
+
+        maximize: function() {
+            this.$photoviewer.get(0).focus();
+            if (!this.isMaximized) {
+                this.modalData = {
+                    width: this.$photoviewer.width(),
+                    height: this.$photoviewer.height(),
+                    left: this.$photoviewer.offset().left,
+                    top: this.$photoviewer.offset().top
+                };
+                this.$photoviewer.addClass(Constants.NS + '-maximize');
+                this.$photoviewer.css({
+                    width: '100%',
+                    height: '100%',
+                    left: 0,
+                    top: 0
+                });
+                this.isMaximized = true;
+            } else {
+                this.$photoviewer.removeClass(Constants.NS + '-maximize');
+                const initModalLeft = (Constants.$W.width() - this.options.modalWidth) / 2 + Constants.$D.scrollLeft();
+                const initModalTop = (Constants.$W.height() - this.options.modalHeight) / 2 + Constants.$D.scrollTop();
+                this.$photoviewer.css({
+                    width: this.modalData.width ? this.modalData.width : this.options.modalWidth,
+                    height: this.modalData.height ? this.modalData.height : this.options.modalHeight,
+                    left: this.modalData.left ? this.modalData.left : initModalLeft,
+                    top: this.modalData.top ? this.modalData.top : initModalTop
+                });
+                this.isMaximized = false;
+            }
+
+            eventer.resized(this._elm);
+        },
+        fullscreen: function() {
+            this.$photoviewer.get(0).focus();
+            Utilities.requestFullscreen(this.$photoviewer[0]);
+        },
+        _keydown: function(e) {
+            if (!this.options.keyboard) {
+                return false;
+            }
+            const keyCode = e.keyCode || e.which || e.charCode;
+            const ctrlKey = e.ctrlKey || e.metaKey;
+            const altKey = e.altKey || e.metaKey;
+            switch (keyCode) {
+
+                // Q
+                case 81:
+                    this.close();
+                    break;
+                default:
+            }
+        }
+
+    });
+
+
+    return Window;
+});
+define('skylark-photoviewer/picture_viewer',[
+    "skylark-domx-eventer",
+    "skylark-domx-plugins-base",
+    "skylark-domx-plugins-interact/movable",
+    'skylark-jquery',
+    './constants',
+    './utilities'
+
+], function (eventer,plugins,Movable,$,  Constants, Utilities) {
+    'use strict';
+
+    var Imager = plugins.Plugin.inherit({
+        klassName : "Imager",
+
+        pluginName : "lark.domx.imager",
+
+        options : {
+            ratioThreshold: 0.1,
+            minRatio: 0.05,
+            maxRatio: 16,
+            movable : true
+        },
+
+        _construct : function(elm,options) {
+            plugins.Plugin.prototype._construct.call(this,elm,options);
+
+            this.$stage = this.$();
+            this.$image = this.$stage.find("img");
+            
+
+            this.$stage.off(Constants.WHEEL_EVENT + Constants.EVENT_NS).on(Constants.WHEEL_EVENT + Constants.EVENT_NS, e => {
+                this._handleWheel(e);
+            });
+
+            if (this.options.movable) {
+                this._movable = new Movable(this.$image[0],{
+                    starting : (e) => {
+                        if (this.$stage.hasClass('is-grab')) {
+
+                        } else {
+                            return false;
+                        }
+                        const imageWidth = this.$image.width();
+                        const imageHeight = this.$image.height();
+                        const stageWidth = this.$stage.width();
+                        const stageHeight = this.$stage.height();
+                        let minX,minY,maxX,maxY;
+
+                        if (stageWidth>=imageWidth) {
+                            minX=maxX=(stageWidth-imageWidth) / 2;
+                        } else {
+                            minX = stageWidth - imageWidth;
+                            maxX = 0;
+                        }
+
+                        if (stageHeight>=imageHeight) {
+                            minY=maxY=(stageHeight-imageHeight) / 2;
+                        } else {
+                            minY = stageHeight - imageHeight;
+                            maxY = 0;
+                        }
+
+                        return {
+                            constraints : {
+                                minX,
+                                maxX,
+                                minY,
+                                maxY
+                            }
+                        };
+                    },
+                    started : function(e) {
+                        eventer.stop(e);
+                    }
+                });
+            }
+
+        }, 
+
+        getImageScaleToStage : function(stageWidth, stageHeight) {
+            let scale = 1;
+            if (!this.isRotated) {
+                scale = Math.min(stageWidth / this.img.width, stageHeight / this.img.height, 1);
+            } else {
+                scale = Math.min(stageWidth / this.img.height, stageHeight / this.img.width, 1);
+            }
+            return scale;
+        },
+
+        setImageSize: function(img) {
+            const stageData = {
+                w: this.$stage.width(),
+                h: this.$stage.height()
+            };
+            const scale = this.getImageScaleToStage(stageData.w, stageData.h);
+            this.$image.css({
+                width: Math.ceil(img.width * scale) + 'px',
+                height: Math.ceil(img.height * scale) + 'px',
+                left: (stageData.w - Math.ceil(img.width * scale)) / 2 + 'px',
+                top: (stageData.h - Math.ceil(img.height * scale)) / 2 + 'px'
+            });
+            $.extend(this.imageData, {
+                initWidth: img.width * scale,
+                initHeight: img.height * scale,
+                initLeft: (stageData.w - img.width * scale) / 2,
+                initTop: (stageData.h - img.height * scale) / 2,
+                width: img.width * scale,
+                height: img.height * scale,
+                left: (stageData.w - img.width * scale) / 2,
+                top: (stageData.h - img.height * scale) / 2
+            });
+            Utilities.setGrabCursor({
+                w: this.$image.width(),
+                h: this.$image.height()
+            }, {
+                w: this.$stage.width(),
+                h: this.$stage.height()
+            }, this.$stage, this.isRotated);
+            if (!this.imageLoaded) {
+                this.$stage.find(Constants.CLASS_NS + '-loader').remove();
+                this.$stage.removeClass('stage-ready');
+                this.$image.removeClass('image-ready');
+                if (this.options.initAnimation && !this.options.progressiveLoading) {
+                    this.$image.fadeIn();
+                }
+                this.imageLoaded = true;
+            }
+        },
+
+        loadImage : function(imgSrc, fn, err) {
+            this.$image.removeAttr('style').attr('src', '');
+            this.isRotated = false;
+            this.rotateAngle = 0;
+            this.imageLoaded = false;
+            this.$stage.append(`<div class="${ Constants.NS }-loader"></div>`);
+            this.$stage.addClass('stage-ready');
+            this.$image.addClass('image-ready');
+            if (this.options.initAnimation && !this.options.progressiveLoading) {
+                this.$image.hide();
+            }
+            this.$image.attr('src', imgSrc);
+            Utilities.preloadImage(imgSrc, img => {
+                this.img = img;
+                this.imageData = {
+                    originalWidth: img.width,
+                    originalHeight: img.height
+                };
+                ///if (this.isMaximized || this.isOpened && this.options.fixedModalPos) {
+                ///    this.setImageSize(img);
+                ///} else {
+                ///    this.setModalSize(img);
+                ///}
+                if (fn) {
+                    fn(img);
+                }
+            }, () => {
+                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
+                if (err) {
+                    err.call();
                 }
             });
+
+        },
+
+        _handleWheel : function(e) {
+            e.preventDefault();
+            let delta = 1;
+            if (e.deltaY) {
+                delta = e.deltaY > 0 ? 1 : -1;
+            } else if (e.wheelDelta) {
+                delta = -e.wheelDelta / 120;
+            } else if (e.detail) {
+                delta = e.detail > 0 ? 1 : -1;
+            }
+            const ratio = -delta * this.options.ratioThreshold;
+            const pointer = {
+                x: e.clientX - this.$stage.offset().left + Constants.$D.scrollLeft(),
+                y: e.clientY - this.$stage.offset().top + Constants.$D.scrollTop()
+            };
+            this.zoom(ratio, pointer, e);
+        },
+
+        zoom : function(ratio, origin, e) {
+            ratio = ratio < 0 ? 1 / (1 - ratio) : 1 + ratio;
+            ratio = this.$image.width() / this.imageData.originalWidth * ratio;
+            if (ratio > this.options.maxRatio || ratio < this.options.minRatio) {
+                return;
+            }
+            this.zoomTo(ratio, origin, e);
+        },
+
+        zoomTo : function(ratio, origin, e) {
+            const $image = this.$image;
+            const $stage = this.$stage;
+            const imgData = {
+                w: this.imageData.width,
+                h: this.imageData.height,
+                x: this.imageData.left,
+                y: this.imageData.top
+            };
+            const stageData = {
+                w: $stage.width(),
+                h: $stage.height(),
+                x: $stage.offset().left,
+                y: $stage.offset().top
+            };
+            const newWidth = this.imageData.originalWidth * ratio;
+            const newHeight = this.imageData.originalHeight * ratio;
+            let newLeft = origin.x - (origin.x - imgData.x) / imgData.w * newWidth;
+            let newTop = origin.y - (origin.y - imgData.y) / imgData.h * newHeight;
+            const δ = !this.isRotated ? 0 : (newWidth - newHeight) / 2;
+            const imgNewWidth = !this.isRotated ? newWidth : newHeight;
+            const imgNewHeight = !this.isRotated ? newHeight : newWidth;
+            const offsetX = stageData.w - newWidth;
+            const offsetY = stageData.h - newHeight;
+            if (imgNewHeight <= stageData.h) {
+                newTop = (stageData.h - newHeight) / 2;
+            } else {
+                newTop = newTop > δ ? δ : newTop > offsetY - δ ? newTop : offsetY - δ;
+            }
+            if (imgNewWidth <= stageData.w) {
+                newLeft = (stageData.w - newWidth) / 2;
+            } else {
+                newLeft = newLeft > -δ ? -δ : newLeft > offsetX + δ ? newLeft : offsetX + δ;
+            }
+            if (Math.abs(this.imageData.initWidth - newWidth) < this.imageData.initWidth * 0.05) {
+                this.setImageSize(this.img);
+            } else {
+                $image.css({
+                    width: Math.round(newWidth) + 'px',
+                    height: Math.round(newHeight) + 'px',
+                    left: Math.round(newLeft) + 'px',
+                    top: Math.round(newTop) + 'px'
+                });
+                Utilities.setGrabCursor({
+                    w: Math.round(imgNewWidth),
+                    h: Math.round(imgNewHeight)
+                }, {
+                    w: stageData.w,
+                    h: stageData.h
+                }, this.$stage);
+            }
+            $.extend(this.imageData, {
+                width: newWidth,
+                height: newHeight,
+                left: newLeft,
+                top: newTop
+            });
+        },
+
+        rotate : function(angle) {
+            this.rotateAngle = this.rotateAngle + angle;
+            if (this.rotateAngle / 90 % 2 === 0) {
+                this.isRotated = false;
+            } else {
+                this.isRotated = true;
+            }
+            this.rotateTo(this.rotateAngle);
+        },
+        rotateTo: function(angle) {
+            this.$image.css({ transform: 'rotate(' + angle + 'deg)' });
+            this.setImageSize({
+                width: this.imageData.originalWidth,
+                height: this.imageData.originalHeight
+            });
+            this.$stage.removeClass('is-grab');
+        },
+        resize: function() {
+            const imageWidth = this.$image.width();
+            const imageHeight = this.$image.height();
+            const stageWidth = this.$stage.width();
+            const stageHeight = this.$stage.height();
+            const left = (stageWidth - imageWidth) /2;
+            const top = (stageHeight- imageHeight) /2;
+            this.$image.css({
+                left,
+                top
+            });
+        },
+
+        shortcut: function(keyCode,ctrlKey,altKey) {
+            var handled = false;
+            switch (keyCode) {
+                // +
+                case 187:
+                    this.zoom(this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // -
+                case 189:
+                    this.zoom(-this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // + Firefox
+                case 61:
+                    this.zoom(this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // - Firefox
+                case 173:
+                    this.zoom(-this.options.ratioThreshold * 3, {
+                        x: this.$stage.width() / 2,
+                        y: this.$stage.height() / 2
+                    }, e);
+                    handled = true;
+                    break;
+                // Ctrl + Alt + 0
+                case 48:
+                    if (ctrlKey && altKey) {
+                        this.zoomTo(1, {
+                            x: this.$stage.width() / 2,
+                            y: this.$stage.height() / 2
+                        }, e);
+                    }
+                    handled = true;
+                    break;
+                // Ctrl + ,
+                case 188:
+                    if (ctrlKey) {
+                        this.rotate(-90);
+                    }
+                    break;
+                // Ctrl + .
+                case 190:
+                    if (ctrlKey) {
+                        this.rotate(90);
+                    }
+                    handled = true;
+                    break;
+                default:
+            }
+
+            return handled;
         }
-    };
+    });
+
+    return Imager;
 });
 define('skylark-photoviewer/core',[
     './domq',
     './defaults',
     './constants',
     './utilities',
-    './draggable',
-    './movable',
-    './resizable'
-], function ($, DEFAULTS, Constants, Utilities, draggable, movable, resizable) {
+    "./window",
+    "./picture_viewer"
+], function ($, DEFAULTS, Constants, Utilities, Window,Imager) {
     'use strict';
+
+    
     class PhotoViewer {
         constructor(items, options, el) {
             this.options = $.extend(true, {}, DEFAULTS, options);
@@ -855,15 +979,15 @@ define('skylark-photoviewer/core',[
             const imgSrc = items[this.groupIndex]['src'];
             this.open();
             this.loadImage(imgSrc);
-            if (opts.draggable) {
-                this.draggable(this.$photoviewer, this.dragHandle, Constants.CLASS_NS + '-button');
-            }
-            if (opts.movable) {
-                this.movable(this.$stage, this.$image);
-            }
-            if (opts.resizable) {
-                this.resizable(this.$photoviewer, this.$stage, this.$image, opts.modalWidth, opts.modalHeight);
-            }
+            ///if (opts.draggable) {
+            ///    this.draggable(this.$photoviewer, this.dragHandle, Constants.CLASS_NS + '-button');
+            ///}
+            ///if (opts.movable) {
+            ///    this.movable(this.$stage, this.$image);
+            ///}
+            ///if (opts.resizable) {
+            ///    this.resizable(this.$photoviewer, this.$stage, this.$image, opts.modalWidth, opts.modalHeight);
+            ///}
         }
         _createBtns(toolbar) {
             const btns = [
@@ -945,8 +1069,19 @@ define('skylark-photoviewer/core',[
                 this.dragHandle = this.$photoviewer.find(this.options.dragHandle);
             }
             $(this.options.appendTo).eq(0).append(this.$photoviewer);
+
+            this._window = new Window(this.$photoviewer[0],{
+                dragHandle : this.options.dragHandle,
+
+            });
+            this._imager = new Imager(this.$stage[0]);
+
             this._addEvents();
             this._addCustomButtonEvents();
+
+            this.$photoviewer.on("resized",()=>{
+                this._imager.resize();;
+            });
         }
         open() {
             this._triggerHook('beforeOpen', this);
@@ -968,25 +1103,7 @@ define('skylark-photoviewer/core',[
             this._triggerHook('opened', this);
         }
         close() {
-            this._triggerHook('beforeClose', this);
-            this.$photoviewer.remove();
-            this.isOpened = false;
-            this.isMaximized = false;
-            this.isRotated = false;
-            this.rotateAngle = 0;
-            if (!$(Constants.CLASS_NS + '-modal').length) {
-                if (this.options.fixedContent) {
-                    $('html').css({
-                        overflow: '',
-                        'padding-right': ''
-                    });
-                }
-                if (this.options.multiInstances) {
-                    Constants.PUBLIC_VARS['zIndex'] = this.options.zIndex;
-                }
-                Constants.$W.off(Constants.RESIZE_EVENT + Constants.EVENT_NS);
-            }
-            this._triggerHook('closed', this);
+            this._window.close();
         }
         setModalPos(modal) {
             const winWidth = Constants.$W.width();
@@ -1053,86 +1170,17 @@ define('skylark-photoviewer/core',[
             }
             this.isOpened = true;
         }
-        getImageScaleToStage(stageWidth, stageHeight) {
-            let scale = 1;
-            if (!this.isRotated) {
-                scale = Math.min(stageWidth / this.img.width, stageHeight / this.img.height, 1);
-            } else {
-                scale = Math.min(stageWidth / this.img.height, stageHeight / this.img.width, 1);
-            }
-            return scale;
-        }
+
         setImageSize(img) {
-            const stageData = {
-                w: this.$stage.width(),
-                h: this.$stage.height()
-            };
-            const scale = this.getImageScaleToStage(stageData.w, stageData.h);
-            this.$image.css({
-                width: Math.ceil(img.width * scale) + 'px',
-                height: Math.ceil(img.height * scale) + 'px',
-                left: (stageData.w - Math.ceil(img.width * scale)) / 2 + 'px',
-                top: (stageData.h - Math.ceil(img.height * scale)) / 2 + 'px'
-            });
-            $.extend(this.imageData, {
-                initWidth: img.width * scale,
-                initHeight: img.height * scale,
-                initLeft: (stageData.w - img.width * scale) / 2,
-                initTop: (stageData.h - img.height * scale) / 2,
-                width: img.width * scale,
-                height: img.height * scale,
-                left: (stageData.w - img.width * scale) / 2,
-                top: (stageData.h - img.height * scale) / 2
-            });
-            Utilities.setGrabCursor({
-                w: this.$image.width(),
-                h: this.$image.height()
-            }, {
-                w: this.$stage.width(),
-                h: this.$stage.height()
-            }, this.$stage, this.isRotated);
-            if (!this.imageLoaded) {
-                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
-                this.$stage.removeClass('stage-ready');
-                this.$image.removeClass('image-ready');
-                if (this.options.initAnimation && !this.options.progressiveLoading) {
-                    this.$image.fadeIn();
-                }
-                this.imageLoaded = true;
-            }
+            this._imager.setImageSize(img);
         }
         loadImage(imgSrc, fn, err) {
-            this.$image.removeAttr('style').attr('src', '');
-            this.isRotated = false;
-            this.rotateAngle = 0;
-            this.imageLoaded = false;
-            this.$photoviewer.append(`<div class="${ Constants.NS }-loader"></div>`);
-            this.$stage.addClass('stage-ready');
-            this.$image.addClass('image-ready');
-            if (this.options.initAnimation && !this.options.progressiveLoading) {
-                this.$image.hide();
-            }
-            this.$image.attr('src', imgSrc);
-            Utilities.preloadImage(imgSrc, img => {
-                this.img = img;
-                this.imageData = {
-                    originalWidth: img.width,
-                    originalHeight: img.height
-                };
-                if (this.isMaximized || this.isOpened && this.options.fixedModalPos) {
-                    this.setImageSize(img);
-                } else {
-                    this.setModalSize(img);
-                }
+            this._imager.loadImage(imgSrc,(img) => {
+                this.setModalSize(img);
                 if (fn) {
                     fn.call();
                 }
-            }, () => {
-                this.$photoviewer.find(Constants.CLASS_NS + '-loader').remove();
-                if (err) {
-                    err.call();
-                }
-            });
+            },err);
             if (this.options.title) {
                 this.setImageTitle(imgSrc);
             }
@@ -1169,161 +1217,26 @@ define('skylark-photoviewer/core',[
                 ]);
             });
         }
-        wheel(e) {
-            e.preventDefault();
-            let delta = 1;
-            if (e.deltaY) {
-                delta = e.deltaY > 0 ? 1 : -1;
-            } else if (e.wheelDelta) {
-                delta = -e.wheelDelta / 120;
-            } else if (e.detail) {
-                delta = e.detail > 0 ? 1 : -1;
-            }
-            const ratio = -delta * this.options.ratioThreshold;
-            const pointer = {
-                x: e.clientX - this.$stage.offset().left + Constants.$D.scrollLeft(),
-                y: e.clientY - this.$stage.offset().top + Constants.$D.scrollTop()
-            };
-            this.zoom(ratio, pointer, e);
-        }
         zoom(ratio, origin, e) {
-            ratio = ratio < 0 ? 1 / (1 - ratio) : 1 + ratio;
-            ratio = this.$image.width() / this.imageData.originalWidth * ratio;
-            if (ratio > this.options.maxRatio || ratio < this.options.minRatio) {
-                return;
-            }
-            this.zoomTo(ratio, origin, e);
+            this._imager.zoom(ratio,origin,e);
         }
         zoomTo(ratio, origin, e) {
-            const $image = this.$image;
-            const $stage = this.$stage;
-            const imgData = {
-                w: this.imageData.width,
-                h: this.imageData.height,
-                x: this.imageData.left,
-                y: this.imageData.top
-            };
-            const stageData = {
-                w: $stage.width(),
-                h: $stage.height(),
-                x: $stage.offset().left,
-                y: $stage.offset().top
-            };
-            const newWidth = this.imageData.originalWidth * ratio;
-            const newHeight = this.imageData.originalHeight * ratio;
-            let newLeft = origin.x - (origin.x - imgData.x) / imgData.w * newWidth;
-            let newTop = origin.y - (origin.y - imgData.y) / imgData.h * newHeight;
-            const δ = !this.isRotated ? 0 : (newWidth - newHeight) / 2;
-            const imgNewWidth = !this.isRotated ? newWidth : newHeight;
-            const imgNewHeight = !this.isRotated ? newHeight : newWidth;
-            const offsetX = stageData.w - newWidth;
-            const offsetY = stageData.h - newHeight;
-            if (imgNewHeight <= stageData.h) {
-                newTop = (stageData.h - newHeight) / 2;
-            } else {
-                newTop = newTop > δ ? δ : newTop > offsetY - δ ? newTop : offsetY - δ;
-            }
-            if (imgNewWidth <= stageData.w) {
-                newLeft = (stageData.w - newWidth) / 2;
-            } else {
-                newLeft = newLeft > -δ ? -δ : newLeft > offsetX + δ ? newLeft : offsetX + δ;
-            }
-            if (Math.abs(this.imageData.initWidth - newWidth) < this.imageData.initWidth * 0.05) {
-                this.setImageSize(this.img);
-            } else {
-                $image.css({
-                    width: Math.round(newWidth) + 'px',
-                    height: Math.round(newHeight) + 'px',
-                    left: Math.round(newLeft) + 'px',
-                    top: Math.round(newTop) + 'px'
-                });
-                Utilities.setGrabCursor({
-                    w: Math.round(imgNewWidth),
-                    h: Math.round(imgNewHeight)
-                }, {
-                    w: stageData.w,
-                    h: stageData.h
-                }, this.$stage);
-            }
-            $.extend(this.imageData, {
-                width: newWidth,
-                height: newHeight,
-                left: newLeft,
-                top: newTop
-            });
+            this._imager.zoomTo(ratio,origin,e);
         }
         rotate(angle) {
-            this.rotateAngle = this.rotateAngle + angle;
-            if (this.rotateAngle / 90 % 2 === 0) {
-                this.isRotated = false;
-            } else {
-                this.isRotated = true;
-            }
-            this.rotateTo(this.rotateAngle);
+            this._imager.rotate(angle);
         }
         rotateTo(angle) {
-            this.$image.css({ transform: 'rotate(' + angle + 'deg)' });
-            this.setImageSize({
-                width: this.imageData.originalWidth,
-                height: this.imageData.originalHeight
-            });
-            this.$stage.removeClass('is-grab');
+            this._imager.rotateTo(angle);
         }
         resize() {
-            const resizeHandler = Utilities.throttle(() => {
-                if (this.isOpened) {
-                    if (this.isMaximized) {
-                        this.setImageSize({
-                            width: this.imageData.originalWidth,
-                            height: this.imageData.originalHeight
-                        });
-                    } else {
-                        this.setModalSize({
-                            width: this.imageData.originalWidth,
-                            height: this.imageData.originalHeight
-                        });
-                    }
-                }
-            }, 500);
-            return resizeHandler;
+            return this._imager.resize();
         }
         maximize() {
-            this.$photoviewer.get(0).focus();
-            if (!this.isMaximized) {
-                this.modalData = {
-                    width: this.$photoviewer.width(),
-                    height: this.$photoviewer.height(),
-                    left: this.$photoviewer.offset().left,
-                    top: this.$photoviewer.offset().top
-                };
-                this.$photoviewer.addClass(Constants.NS + '-maximize');
-                this.$photoviewer.css({
-                    width: '100%',
-                    height: '100%',
-                    left: 0,
-                    top: 0
-                });
-                this.isMaximized = true;
-            } else {
-                this.$photoviewer.removeClass(Constants.NS + '-maximize');
-                const initModalLeft = (Constants.$W.width() - this.options.modalWidth) / 2 + Constants.$D.scrollLeft();
-                const initModalTop = (Constants.$W.height() - this.options.modalHeight) / 2 + Constants.$D.scrollTop();
-                this.$photoviewer.css({
-                    width: this.modalData.width ? this.modalData.width : this.options.modalWidth,
-                    height: this.modalData.height ? this.modalData.height : this.options.modalHeight,
-                    left: this.modalData.left ? this.modalData.left : initModalLeft,
-                    top: this.modalData.top ? this.modalData.top : initModalTop
-                });
-                this.isMaximized = false;
-            }
-            this.setImageSize({
-                width: this.imageData.originalWidth,
-                height: this.imageData.originalHeight
-            });
+            this._window.maximize();
         }
         fullscreen() {
-            this.$photoviewer.get(0).focus();
-            Utilities.requestFullscreen(this.$photoviewer[0]);
+            this._window.fullscreen();
         }
         _keydown(e) {
             if (!this.options.keyboard) {
@@ -1341,55 +1254,6 @@ define('skylark-photoviewer/core',[
                 case 39:
                     this.jump(1);
                     break;
-                // +
-                case 187:
-                    this.zoom(this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // -
-                case 189:
-                    this.zoom(-this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // + Firefox
-                case 61:
-                    this.zoom(this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // - Firefox
-                case 173:
-                    this.zoom(-this.options.ratioThreshold * 3, {
-                        x: this.$stage.width() / 2,
-                        y: this.$stage.height() / 2
-                    }, e);
-                    break;
-                // Ctrl + Alt + 0
-                case 48:
-                    if (ctrlKey && altKey) {
-                        this.zoomTo(1, {
-                            x: this.$stage.width() / 2,
-                            y: this.$stage.height() / 2
-                        }, e);
-                    }
-                    break;
-                // Ctrl + ,
-                case 188:
-                    if (ctrlKey) {
-                        this.rotate(-90);
-                    }
-                    break;
-                // Ctrl + .
-                case 190:
-                    if (ctrlKey) {
-                        this.rotate(90);
-                    }
-                    break;
                 // Q
                 case 81:
                     this.close();
@@ -1398,12 +1262,7 @@ define('skylark-photoviewer/core',[
             }
         }
         _addEvents() {
-            this.$close.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, e => {
-                this.close();
-            });
-            this.$stage.off(Constants.WHEEL_EVENT + Constants.EVENT_NS).on(Constants.WHEEL_EVENT + Constants.EVENT_NS, e => {
-                this.wheel(e);
-            });
+
             this.$zoomIn.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, e => {
                 this.zoom(this.options.ratioThreshold * 3, {
                     x: this.$stage.width() / 2,
@@ -1425,9 +1284,7 @@ define('skylark-photoviewer/core',[
             this.$prev.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
                 this.jump(-1);
             });
-            this.$fullscreen.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
-                this.fullscreen();
-            });
+
             this.$next.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
                 this.jump(1);
             });
@@ -1437,13 +1294,11 @@ define('skylark-photoviewer/core',[
             this.$rotateRight.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
                 this.rotate(90);
             });
-            this.$maximize.off(Constants.CLICK_EVENT + Constants.EVENT_NS).on(Constants.CLICK_EVENT + Constants.EVENT_NS, () => {
-                this.maximize();
-            });
+
             this.$photoviewer.off(Constants.KEYDOWN_EVENT + Constants.EVENT_NS).on(Constants.KEYDOWN_EVENT + Constants.EVENT_NS, e => {
                 this._keydown(e);
             });
-            Constants.$W.on(Constants.RESIZE_EVENT + Constants.EVENT_NS, this.resize());
+            ///Constants.$W.on(Constants.RESIZE_EVENT + Constants.EVENT_NS, this.resize());
         }
         _addCustomButtonEvents() {
             for (const btnKey in this.options.customButtons) {
@@ -1461,7 +1316,10 @@ define('skylark-photoviewer/core',[
             }
         }
     }
-    $.extend(PhotoViewer.prototype, draggable, movable, resizable);
+    //$.extend(PhotoViewer.prototype, draggable, movable, resizable);
+
+    ///$.extend(PhotoViewer.prototype, movable);
+
     window.PhotoViewer = PhotoViewer;
     return PhotoViewer;
 });
