@@ -19364,6 +19364,70 @@ define('skylark-domx/noder',[
 
     return noder;
 });
+define('skylark-domx-plugins-panels/panels',[
+  "skylark-langx/skylark",
+  "skylark-langx/langx",
+  "skylark-domx-browser",
+  "skylark-domx-eventer",
+  "skylark-domx-noder",
+  "skylark-domx-geom",
+  "skylark-domx-query"
+],function(skylark,langx,browser,eventer,noder,geom,$){
+	var panels = {};
+
+	var CONST = {
+		BACKSPACE_KEYCODE: 8,
+		COMMA_KEYCODE: 188, // `,` & `<`
+		DELETE_KEYCODE: 46,
+		DOWN_ARROW_KEYCODE: 40,
+		ENTER_KEYCODE: 13,
+		TAB_KEYCODE: 9,
+		UP_ARROW_KEYCODE: 38
+	};
+
+	var isShiftHeld = function isShiftHeld (e) { return e.shiftKey === true; };
+
+	var isKey = function isKey (keyCode) {
+		return function compareKeycodes (e) {
+			return e.keyCode === keyCode;
+		};
+	};
+
+	var isBackspaceKey = isKey(CONST.BACKSPACE_KEYCODE);
+	var isDeleteKey = isKey(CONST.DELETE_KEYCODE);
+	var isTabKey = isKey(CONST.TAB_KEYCODE);
+	var isUpArrow = isKey(CONST.UP_ARROW_KEYCODE);
+	var isDownArrow = isKey(CONST.DOWN_ARROW_KEYCODE);
+
+	var ENCODED_REGEX = /&[^\s]*;/;
+	/*
+	 * to prevent double encoding decodes content in loop until content is encoding free
+	 */
+	var cleanInput = function cleanInput (questionableMarkup) {
+		// check for encoding and decode
+		while (ENCODED_REGEX.test(questionableMarkup)) {
+			questionableMarkup = $('<i>').html(questionableMarkup).text();
+		}
+
+		// string completely decoded now encode it
+		return $('<i>').text(questionableMarkup).html();
+	};
+
+	langx.mixin(panels, {
+		CONST: CONST,
+		cleanInput: cleanInput,
+		isBackspaceKey: isBackspaceKey,
+		isDeleteKey: isDeleteKey,
+		isShiftHeld: isShiftHeld,
+		isTabKey: isTabKey,
+		isUpArrow: isUpArrow,
+		isDownArrow: isDownArrow
+	});
+
+	return skylark.attach("domx.plugins.panels",panels);
+
+});
+
 define('skylark-domx-plugins-interact/resizable',[
     "skylark-langx/langx",
     "skylark-domx-noder",
@@ -19562,31 +19626,129 @@ define('skylark-domx-plugins-interact/resizable',[
     return interact.Resizable = Resizable;
 });
 
-define('skylark-domx-plugins-windows/windows',[
-    "skylark-langx/skylark"
-],function (skylark) {
-    'use strict';
+define('skylark-domx-plugins-panels/panel',[
+  "skylark-langx/langx",
+  "skylark-domx-browser",
+  "skylark-domx-eventer",
+  "skylark-domx-noder",
+  "skylark-domx-geom",
+  "skylark-domx-query",
+  "skylark-domx-plugins-base",
+  "skylark-domx-plugins-interact/resizable",
+  "./panels",
+],function(langx,browser,eventer,noder,geom,$,plugins,Resizable,panels){
 
-    return skylark.attach("domx.plugins.windows");
+  var Panel = plugins.Plugin.inherit({
+    klassName : "Panel",
+
+    pluginName : "domx.panels.panel",
+
+    options : {
+      resizable : {
+          minWidth: 320,
+          minHeight: 320,
+          border : {
+              classes :  {
+                  all : "resizable-handle",
+                  top : "resizable-handle-n",
+                  left: "resizable-handle-w",
+                  right: "resizable-handle-e",
+                  bottom: "resizable-handle-s", 
+                  topLeft : "resizable-handle-nw", 
+                  topRight : "resizable-handle-ne",
+                  bottomLeft : "resizable-handle-sw",             
+                  bottomRight : "resizable-handle-se"     
+              }
+          }
+      }
+    },
+
+    _construct : function(elm,options) {
+      this.overrided(elm,options);
+      this._velm = this.elmx();
+
+      if (this.options.resizable) {
+
+          this._resizable = new Resizable(elm,{
+              handle : {
+                  border : {
+                      directions : {
+                          top: true, //n
+                          left: true, //w
+                          right: true, //e
+                          bottom: true, //s
+                          topLeft : true, // nw
+                          topRight : true, // ne
+                          bottomLeft : true, // sw
+                          bottomRight : true // se                         
+                      },
+                      classes : {
+                          all : this.options.resizable.border.classes.all,
+                          top : this.options.resizable.border.classes.top,
+                          left: this.options.resizable.border.classes.left,
+                          right: this.options.resizable.border.classes.right,
+                          bottom: this.options.resizable.border.classes.bottom, 
+                          topLeft : this.options.resizable.border.classes.topLeft, 
+                          topRight : this.options.resizable.border.classes.topRight,
+                          bottomLeft : this.options.resizable.border.classes.bottomLeft,             
+                          bottomRight : this.options.resizable.border.classes.bottomRight                        
+                      }                        
+                  }
+              },
+              constraints : {
+                  minWidth : this.options.resizable.minWidth,
+                  minHeight : this.options.resizable.minHeight
+              },
+              started : () => {
+                  this.isResizing = true;
+              },
+              moving : function(e) {
+                  /*
+                  const imageWidth = $(image).width();
+                  const imageHeight = $(image).height();
+                  const stageWidth = $(stage).width();
+                  const stageHeight = $(stage).height();
+                  const left = (stageWidth - imageWidth) /2;
+                  const top = (stageHeight- imageHeight) /2;
+                  $(image).css({
+                      left,
+                      top
+                  });
+                  */
+              },
+              stopped : () => {
+                  this.isResizing = false;
+              }
+          });
+
+      }
+    },
+
+
+  });
+
+  plugins.register(Panel);
+
+  return Panel;
 
 });
-define('skylark-domx-plugins-windows/window',[
+define('skylark-domx-plugins-panels/floating',[
     "skylark-domx/noder",
     "skylark-domx/eventer",
     "skylark-domx/query",
     "skylark-domx-plugins-base",
     "skylark-domx-plugins-interact/movable",
-    "skylark-domx-plugins-interact/resizable",
-    "./windows"
-], function (noder,eventer,$,plugins,Movable, Resizable,windows) {
+    "./panels",
+    "./panel"
+], function (noder,eventer,$,plugins,Movable, panels,Panel) {
     'use strict';
 
-    var windows = [];
+    var floatings = [];
 
-    var Window = plugins.Plugin.inherit({
-        klassName : "Window",
+    var Floating = Panel.inherit({
+        klassName : "Floating",
 
-        pluginName : "lark.domx.window",
+        pluginName : "domx.panels.floating",
 
         options : {
             selectors : {
@@ -19612,34 +19774,15 @@ define('skylark-domx-plugins-windows/window',[
             movable : {
                 dragHandle: false,
                 dragCancel: null
-            },
-            resizable : {
-                minWidth: 320,
-                minHeight: 320,
-                border : {
-                    classes :  {
-                        all : "resizable-handle",
-                        top : "resizable-handle-n",
-                        left: "resizable-handle-w",
-                        right: "resizable-handle-e",
-                        bottom: "resizable-handle-s", 
-                        topLeft : "resizable-handle-nw", 
-                        topRight : "resizable-handle-ne",
-                        bottomLeft : "resizable-handle-sw",             
-                        bottomRight : "resizable-handle-se"     
-                    }
-                }
             }
         },
 
         _construct : function(elm,options) {
-            plugins.Plugin.prototype._construct.call(this,elm,options);
+            Panel.prototype._construct.call(this,elm,options);
+            this.$pane = $(this._elm);
+
             this.isOpened = false;
             this.isMaximized = false;
-
-            this.$window = $(this._elm);
-
-            this._velm = this.elmx();
 
             if (this.options.movable) {
                 this._movable = new Movable(elm,{
@@ -19660,62 +19803,6 @@ define('skylark-domx-plugins-windows/window',[
 
             }
 
-            if (this.options.resizable) {
-
-                this._resizable = new Resizable(elm,{
-                    handle : {
-                        border : {
-                            directions : {
-                                top: true, //n
-                                left: true, //w
-                                right: true, //e
-                                bottom: true, //s
-                                topLeft : true, // nw
-                                topRight : true, // ne
-                                bottomLeft : true, // sw
-                                bottomRight : true // se                         
-                            },
-                            classes : {
-                                all : this.options.resizable.border.classes.all,
-                                top : this.options.resizable.border.classes.top,
-                                left: this.options.resizable.border.classes.left,
-                                right: this.options.resizable.border.classes.right,
-                                bottom: this.options.resizable.border.classes.bottom, 
-                                topLeft : this.options.resizable.border.classes.topLeft, 
-                                topRight : this.options.resizable.border.classes.topRight,
-                                bottomLeft : this.options.resizable.border.classes.bottomLeft,             
-                                bottomRight : this.options.resizable.border.classes.bottomRight                        
-                            }                        
-                        }
-                    },
-                    constraints : {
-                        minWidth : this.options.resizable.minWidth,
-                        minHeight : this.options.resizable.minHeight
-                    },
-                    started : function(){
-                        this.isResizing = true;
-                    },
-                    moving : function(e) {
-                        /*
-                        const imageWidth = $(image).width();
-                        const imageHeight = $(image).height();
-                        const stageWidth = $(stage).width();
-                        const stageHeight = $(stage).height();
-                        const left = (stageWidth - imageWidth) /2;
-                        const top = (stageHeight- imageHeight) /2;
-                        $(image).css({
-                            left,
-                            top
-                        });
-                        */
-                    },
-                    stopped :function () {
-                        this.isResizing = false;
-                    }
-                });
-
-            }
-
             this.$close = this._velm.$(this.options.selectors.buttons.close);
             this.$maximize = this._velm.$(this.options.selectors.buttons.maximize);
             this.$minimize = this._velm.$(this.options.selectors.buttons.minimize);
@@ -19731,15 +19818,15 @@ define('skylark-domx-plugins-windows/window',[
             this.$maximize.off("click.window").on("click.window", () => {
                 this.maximize();
             });
-            this.$window.off("keydown.window").on("keydown.window", e => {
+            this.$pane.off("keydown.window").on("keydown.window", e => {
                 this._keydown(e);
             });
 
-            windows.push(this);
+            floatings.push(this);
         },
         close: function() {
             this.trigger('closing', this);
-            this.$window.remove();
+            this.$pane.remove();
             this.isOpened = false;
             this.isMaximized = false;
 
@@ -19754,24 +19841,24 @@ define('skylark-domx-plugins-windows/window',[
                 ///    zIndex = this.options.zIndex;
                 ///}
             ///    eventer.off(window,"resize.window");
-            var idx = windows.indexOf(this);
+            var idx = floatings.indexOf(this);
             if (idx>-1) {
-                windows.splice(idx,1);
+                floatings.splice(idx,1);
             }
             this.trigger('closed', this);
         },
 
         maximize: function() {
-            this.$window.get(0).focus();
+            this.$pane.get(0).focus();
             if (!this.isMaximized) {
                 this.modalData = {
-                    width: this.$window.width(),
-                    height: this.$window.height(),
-                    left: this.$window.offset().left,
-                    top: this.$window.offset().top
+                    width: this.$pane.width(),
+                    height: this.$pane.height(),
+                    left: this.$pane.offset().left,
+                    top: this.$pane.offset().top
                 };
-                this.$window.addClass(this.options.classes.maximize);
-                this.$window.css({
+                this.$pane.addClass(this.options.classes.maximize);
+                this.$pane.css({
                     width: '100%',
                     height: '100%',
                     left: 0,
@@ -19780,10 +19867,10 @@ define('skylark-domx-plugins-windows/window',[
                 this.isMaximized = true;
             } else {
                 let $W = $(window),$D = $(document);
-                this.$window.removeClass(this.options.classes.maximize);
+                this.$pane.removeClass(this.options.classes.maximize);
                 const initModalLeft = ($W.width() - this.options.modalWidth) / 2 + $D.scrollLeft();
                 const initModalTop = ($W.height() - this.options.modalHeight) / 2 + $D.scrollTop();
-                this.$window.css({
+                this.$pane.css({
                     width: this.modalData.width ? this.modalData.width : this.options.modalWidth,
                     height: this.modalData.height ? this.modalData.height : this.options.modalHeight,
                     left: this.modalData.left ? this.modalData.left : initModalLeft,
@@ -19795,8 +19882,8 @@ define('skylark-domx-plugins-windows/window',[
             eventer.resized(this._elm);
         },
         fullscreen: function() {
-            this.$window.get(0).focus();
-            noder.fullscreen(this.$window[0]);
+            this.$pane.get(0).focus();
+            noder.fullscreen(this.$pane[0]);
         },
         _keydown: function(e) {
             if (!this.options.keyboard) {
@@ -19818,12 +19905,12 @@ define('skylark-domx-plugins-windows/window',[
     });
 
     eventer.on(window,"resize.window", ()=>{
-        for (let i=0; i<windows.length; i++ ) {
-            eventer.resized(windows[i]._elm);
+        for (let i=0; i<floatings.length; i++ ) {
+            eventer.resized(floatings[i]._elm);
         }
     });
 
-    return windows.Window = Window;
+    return panels.Floating = Floating;
 });
 define('skylark-domx-forms/forms',[
 	"skylark-langx/skylark"
@@ -23232,7 +23319,7 @@ define('skylark-photoviewer/constants',[
 });
 define('skylark-photoviewer/core',[
     "skylark-domx-plugins-pictures/viewer",
-    "skylark-domx-plugins-windows/window",
+    "skylark-domx-plugins-panels/floating",
     './domq',
     './defaults',
     './constants',

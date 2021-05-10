@@ -1,6 +1,6 @@
 define([
     "skylark-domx-plugins-pictures/viewer",
-    "skylark-domx-plugins-windows/window",
+    "skylark-domx-plugins-panels/floating",
     './domq',
     './defaults',
     './constants',

@@ -252,8 +252,8 @@ requirejs.config({
             main: 'main'
           },
           {
-            name: 'skylark-domx-plugins-windows',
-            location : "../node_modules/skylark-domx-plugins-windows/dist/uncompressed/skylark-domx-plugins-windows",
+            name: 'skylark-domx-plugins-panels',
+            location : "../node_modules/skylark-domx-plugins-panels/dist/uncompressed/skylark-domx-plugins-panels",
             main: 'main'
           },
           {
